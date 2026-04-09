@@ -1,7 +1,8 @@
-import { useRef, useMemo, useState } from 'react'
+import { useRef, useMemo, useState, useCallback } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { colors } from './theme'
+import { startMusic } from './music'
 
 function heightAt(x, z) {
   return (
@@ -146,12 +147,21 @@ function CinematicCamera() {
 export default function App() {
   const [modeIndex, setModeIndex] = useState(1)
   const mode = MODES[modeIndex]
+  const musicStarted = useRef(false)
+
+  const handleClick = useCallback(() => {
+    if (!musicStarted.current) {
+      startMusic()
+      musicStarted.current = true
+    }
+    setModeIndex(i => (i + 1) % MODES.length)
+  }, [])
 
   return (
     <div
       className="letterbox"
       style={{ width: '100dvw', height: '100dvh', cursor: 'pointer', position: 'relative' }}
-      onClick={() => setModeIndex(i => (i + 1) % MODES.length)}
+      onClick={handleClick}
     >
       <div style={{
         position: 'absolute',
