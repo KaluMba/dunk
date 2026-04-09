@@ -1,7 +1,7 @@
 import { useRef, useMemo, useState, useCallback } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { colors } from './theme'
+import { PALETTES, LIGHTINGS, FOGS, RENDER_MODES } from './theme'
 import { startMusic } from './music'
 
 function heightAt(x, z) {
@@ -12,10 +12,18 @@ function heightAt(x, z) {
   )
 }
 
-// Render modes: wireframe → solid → polygon → height
-const MODES = ['wireframe', 'solid', 'polygon', 'height']
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)] }
 
-function Terrain({ mode }) {
+function randomVariant() {
+  return {
+    renderMode: pick(RENDER_MODES),
+    palette:    pick(PALETTES),
+    lighting:   pick(LIGHTINGS),
+    fog:        pick(FOGS),
+  }
+}
+
+function Terrain({ renderMode, palette }) {
   const geometry = useMemo(() => {
     const geo = new THREE.PlaneGeometry(80, 80, 80, 80)
     geo.rotateX(-Math.PI / 2)
@@ -35,37 +43,37 @@ function Terrain({ mode }) {
     return geo
   }, [])
 
-  if (mode === 'wireframe') return (
+  if (renderMode === 'wireframe') return (
     <mesh geometry={geometry}>
-      <meshBasicMaterial color="#00ff88" wireframe />
+      <meshBasicMaterial color={palette.wire} wireframe />
     </mesh>
   )
-  if (mode === 'polygon') return (
+  if (renderMode === 'polygon') return (
     <mesh geometry={geometry}>
-      <meshStandardMaterial color="#b03a0e" flatShading roughness={0.9} />
+      <meshStandardMaterial color={palette.terrain} flatShading roughness={0.9} />
     </mesh>
   )
-  if (mode === 'height') return (
+  if (renderMode === 'height') return (
     <mesh geometry={geometry} receiveShadow>
       <meshStandardMaterial vertexColors roughness={0.7} />
     </mesh>
   )
   return (
     <mesh geometry={geometry} receiveShadow>
-      <meshStandardMaterial color={colors.terrain} roughness={1} />
+      <meshStandardMaterial color={palette.terrain} roughness={1} />
     </mesh>
   )
 }
 
-function Tree({ x, z, mode }) {
+function Tree({ x, z, renderMode, palette }) {
   const y = heightAt(x, z)
-  const isWire = mode === 'wireframe'
-  const isPoly = mode === 'polygon'
-  const isHeight = mode === 'height'
+  const isWire   = renderMode === 'wireframe'
+  const isHeight = renderMode === 'height'
+  const isPoly   = renderMode === 'polygon'
 
-  const trunk = isWire ? '#00ff88' : isPoly ? '#7a2a08' : isHeight ? '#555555' : colors.treeTrunk
-  const dark  = isWire ? '#00ff88' : isPoly ? '#c04418' : isHeight ? '#888888' : colors.treeDark
-  const light = isWire ? '#00ff88' : isPoly ? '#e06030' : isHeight ? '#aaaaaa' : colors.treeLight
+  const trunk = isWire ? palette.wire : isHeight ? '#555' : palette.trunk
+  const dark  = isWire ? palette.wire : isHeight ? '#888' : palette.dark
+  const light = isWire ? palette.wire : isHeight ? '#aaa' : palette.light
 
   return (
     <group position={[x, y, z]}>
@@ -91,21 +99,12 @@ const TREES = Array.from({ length: 40 }, (_, i) => {
   return { x: Math.cos(angle + i) * r, z: Math.sin(angle + i) * r }
 })
 
-// Each shot: start = camera teleports here on cut (null = continue from current)
-//            end   = camera smoothly drifts to here
-//            look  = what the camera looks at
 const SHOTS = [
-  // High establishing — slow descent from above
   { start: [0, 32, 42],   end: [0, 18, 25],    look: [0, 0, 0],   duration: 10 },
-  // Ground level push through the trees — cut
   { start: [14, 1.8, 18], end: [6, 1.8, 9],    look: [0, 1.5, 0], duration: 9, cut: true },
-  // Continue low, banking left across the terrain
   { start: null,           end: [-16, 4, 1],   look: [0, 2, 0],   duration: 9 },
-  // Top-down overhead descent — cut
   { start: [2, 40, 2],     end: [2, 24, 2],     look: [0, 0, 0],   duration: 9, cut: true },
-  // Wide diagonal sweep across the whole scene
   { start: null,           end: [28, 11, -12], look: [0, 1, 0],   duration: 10 },
-  // Dramatic close ground shot, looking slightly up — cut
   { start: [-9, 1.5, 16], end: [-3, 1.5, 7],  look: [0, 3.5, 0], duration: 8, cut: true },
 ]
 
@@ -145,8 +144,7 @@ function CinematicCamera() {
 }
 
 export default function App() {
-  const [modeIndex, setModeIndex] = useState(1)
-  const mode = MODES[modeIndex]
+  const [variant, setVariant] = useState(randomVariant)
   const musicStarted = useRef(false)
 
   const handleClick = useCallback(() => {
@@ -154,8 +152,10 @@ export default function App() {
       startMusic()
       musicStarted.current = true
     }
-    setModeIndex(i => (i + 1) % MODES.length)
+    setVariant(randomVariant())
   }, [])
+
+  const { renderMode, palette, lighting, fog } = variant
 
   return (
     <div
@@ -191,13 +191,18 @@ export default function App() {
         dunk
       </div>
       <Canvas shadows camera={{ position: [0, 32, 42], fov: 60 }}>
-        <color attach="background" args={[colors.background]} />
-        <fog attach="fog" color={colors.background} near={42} far={80} />
-        <ambientLight intensity={0.5} />
-        <directionalLight position={[20, 30, 10]} intensity={1.5} castShadow />
+        <color attach="background" args={[palette.bg]} />
+        <fog attach="fog" color={palette.bg} near={fog.near} far={fog.far} />
+        <ambientLight intensity={lighting.ambient} />
+        <directionalLight
+          position={lighting.pos}
+          intensity={lighting.intensity}
+          color={lighting.color}
+          castShadow
+        />
         <CinematicCamera />
-        <Terrain mode={mode} />
-        {TREES.map((t, i) => <Tree key={i} x={t.x} z={t.z} mode={mode} />)}
+        <Terrain renderMode={renderMode} palette={palette} />
+        {TREES.map((t, i) => <Tree key={i} x={t.x} z={t.z} renderMode={renderMode} palette={palette} />)}
       </Canvas>
     </div>
   )
