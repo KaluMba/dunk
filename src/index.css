@@ -6,6 +6,7 @@
 
 body {
   overflow: hidden;
+  min-height: 100dvh;
 }
 
 :root {
