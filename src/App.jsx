@@ -1,5 +1,6 @@
 import { useRef, useMemo, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { Text } from '@react-three/drei'
 import * as THREE from 'three'
 import { colors } from './theme'
 
@@ -159,6 +160,16 @@ export default function App() {
         <ambientLight intensity={0.5} />
         <directionalLight position={[20, 30, 10]} intensity={1.5} castShadow />
         <CinematicCamera />
+        <Text
+          position={[0, 18, -10]}
+          fontSize={8}
+          color="white"
+          anchorX="center"
+          anchorY="middle"
+          letterSpacing={0.05}
+        >
+          dunk
+        </Text>
         <Terrain mode={mode} />
         {TREES.map((t, i) => <Tree key={i} x={t.x} z={t.z} mode={mode} />)}
       </Canvas>
