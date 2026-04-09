@@ -155,18 +155,27 @@ export default function App() {
     >
       <div style={{
         position: 'absolute',
-        top: '18%',
-        left: 0,
-        right: 0,
-        textAlign: 'center',
+        inset: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         zIndex: 10,
         pointerEvents: 'none',
         fontFamily: "'Syne', sans-serif",
         fontWeight: 800,
-        fontSize: 'clamp(5rem, 18vw, 16rem)',
-        color: 'white',
+        fontSize: 'clamp(5rem, 22vw, 20rem)',
         letterSpacing: '-0.03em',
         lineHeight: 1,
+        background: `repeating-linear-gradient(
+          -55deg,
+          rgba(255,255,255,0.95) 0px,
+          rgba(255,255,255,0.95) 2px,
+          rgba(255,255,255,0.08) 2px,
+          rgba(255,255,255,0.08) 12px
+        )`,
+        WebkitBackgroundClip: 'text',
+        backgroundClip: 'text',
+        color: 'transparent',
         mixBlendMode: 'overlay',
       }}>
         dunk
