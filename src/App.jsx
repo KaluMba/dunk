@@ -1,6 +1,5 @@
 import { useRef, useMemo, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Text } from '@react-three/drei'
 import * as THREE from 'three'
 import { colors } from './theme'
 
@@ -151,25 +150,33 @@ export default function App() {
   return (
     <div
       className="letterbox"
-      style={{ width: '100dvw', height: '100dvh', cursor: 'pointer' }}
+      style={{ width: '100dvw', height: '100dvh', cursor: 'pointer', position: 'relative' }}
       onClick={() => setModeIndex(i => (i + 1) % MODES.length)}
     >
+      <div style={{
+        position: 'absolute',
+        top: '18%',
+        left: 0,
+        right: 0,
+        textAlign: 'center',
+        zIndex: 10,
+        pointerEvents: 'none',
+        fontFamily: "'Syne', sans-serif",
+        fontWeight: 800,
+        fontSize: 'clamp(5rem, 18vw, 16rem)',
+        color: 'white',
+        letterSpacing: '-0.03em',
+        lineHeight: 1,
+        mixBlendMode: 'overlay',
+      }}>
+        dunk
+      </div>
       <Canvas shadows camera={{ position: [0, 32, 42], fov: 60 }}>
         <color attach="background" args={[colors.background]} />
         <fog attach="fog" color={colors.background} near={42} far={80} />
         <ambientLight intensity={0.5} />
         <directionalLight position={[20, 30, 10]} intensity={1.5} castShadow />
         <CinematicCamera />
-        <Text
-          position={[0, 18, -10]}
-          fontSize={8}
-          color="white"
-          anchorX="center"
-          anchorY="middle"
-          letterSpacing={0.05}
-        >
-          dunk
-        </Text>
         <Terrain mode={mode} />
         {TREES.map((t, i) => <Tree key={i} x={t.x} z={t.z} mode={mode} />)}
       </Canvas>
