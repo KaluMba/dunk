@@ -1,5 +1,5 @@
 export const colors = {
-  background: '#1a1625',
+  background: '#000000',
   terrain: '#2a4a1a',
   treeTrunk: '#3d2010',
   treeDark: '#1a3a0a',
