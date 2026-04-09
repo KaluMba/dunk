@@ -1,6 +1,4 @@
 export const colors = {
-  background: '#0a0a0a',
-  dotBlue: '#4ab8ff',
-  dotRed: '#ff4a6e',
+  background: '#1a1625',
   accentLight: '#a0c4ff',
 }
