@@ -29,11 +29,16 @@ body {
   position: fixed;
   left: 0;
   right: 0;
-  height: 10%;
-  background: var(--color-background);
+  height: 18%;
   z-index: 10;
   pointer-events: none;
 }
 
-.letterbox::before { top: 0; }
-.letterbox::after  { bottom: 0; }
+.letterbox::before {
+  top: 0;
+  background: linear-gradient(to bottom, var(--color-background) 0%, transparent 100%);
+}
+.letterbox::after {
+  bottom: 0;
+  background: linear-gradient(to top, var(--color-background) 0%, transparent 100%);
+}
