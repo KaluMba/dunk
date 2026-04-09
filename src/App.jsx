@@ -1,13 +1,32 @@
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls } from '@react-three/drei'
+import { OrbitControls, CubeCamera, Text } from '@react-three/drei'
 import { colors } from './theme'
 
-function Cube() {
+function DunkText() {
   return (
-    <mesh>
-      <boxGeometry args={[2, 2, 2]} />
-      <meshStandardMaterial color={colors.accent} roughness={0.3} metalness={0.6} />
-    </mesh>
+    <Text
+      position={[0, 0, -4]}
+      fontSize={1.5}
+      color="white"
+      anchorX="center"
+      anchorY="middle"
+      letterSpacing={0.2}
+    >
+      dunk
+    </Text>
+  )
+}
+
+function MirrorCube() {
+  return (
+    <CubeCamera resolution={512} frames={Infinity}>
+      {(texture) => (
+        <mesh>
+          <boxGeometry args={[2, 2, 2]} />
+          <meshStandardMaterial envMap={texture} metalness={1} roughness={0} />
+        </mesh>
+      )}
+    </CubeCamera>
   )
 }
 
@@ -18,7 +37,8 @@ export default function App() {
       <ambientLight intensity={0.4} />
       <directionalLight position={[10, 10, 5]} intensity={1.2} />
       <pointLight position={[-10, -10, -5]} intensity={0.5} color={colors.accentLight} />
-      <Cube />
+      <DunkText />
+      <MirrorCube />
       <OrbitControls enableZoom autoRotate autoRotateSpeed={1.5} />
     </Canvas>
   )
