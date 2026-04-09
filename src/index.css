@@ -22,3 +22,18 @@ body {
   width: 100%;
   height: 100%;
 }
+
+.letterbox::before,
+.letterbox::after {
+  content: '';
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 10%;
+  background: #000;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.letterbox::before { top: 0; }
+.letterbox::after  { bottom: 0; }
