@@ -93,6 +93,144 @@ function Tree({ x, z, renderMode, palette }) {
   )
 }
 
+const CAT_COLOR = '#c8783a'
+const CAT_EYE   = '#1a5a28'
+const CAT_NOSE  = '#d07070'
+
+function Cat({ renderMode, palette }) {
+  const groupRef = useRef()
+  const tailRef  = useRef()
+  const fl = useRef(), fr = useRef(), bl = useRef(), br = useRef()
+
+  const px     = useRef(8)
+  const pz     = useRef(3)
+  const dir    = useRef(0)
+  const moving = useRef(true)
+  const timer  = useRef(Math.random() * 2)
+  const phase  = useRef(0)
+
+  useFrame((_, delta) => {
+    timer.current += delta
+
+    if (timer.current > 2.5 + Math.random() * 4) {
+      timer.current = 0
+      moving.current = Math.random() > 0.22
+      dir.current   += (Math.random() - 0.5) * Math.PI * 1.4
+    }
+
+    if (moving.current) {
+      phase.current += delta * 5
+      px.current += Math.sin(dir.current) * 1.8 * delta
+      pz.current += Math.cos(dir.current) * 1.8 * delta
+      if (Math.hypot(px.current, pz.current) > 26)
+        dir.current = Math.atan2(-px.current, -pz.current)
+    }
+
+    // Diagonal gait: FL+BR in phase, FR+BL opposite
+    const swing = Math.sin(phase.current) * (moving.current ? 0.45 : 0.03)
+    if (fl.current) fl.current.rotation.x =  swing
+    if (fr.current) fr.current.rotation.x = -swing
+    if (bl.current) bl.current.rotation.x = -swing
+    if (br.current) br.current.rotation.x =  swing
+
+    if (tailRef.current)
+      tailRef.current.rotation.z = Math.sin(timer.current * 1.8) * 0.45 + 0.2
+
+    const bob = moving.current ? Math.sin(phase.current * 2) * 0.03 : 0
+    if (groupRef.current) {
+      groupRef.current.position.set(px.current, heightAt(px.current, pz.current) + 0.38 + bob, pz.current)
+      groupRef.current.rotation.y = dir.current
+    }
+  })
+
+  const isWire = renderMode === 'wireframe'
+  const c    = isWire ? palette.wire : CAT_COLOR
+  const flat = renderMode === 'polygon'
+  const mats = { color: c, wireframe: isWire, roughness: 0.9, flatShading: flat }
+
+  return (
+    <group ref={groupRef}>
+      {/* Body */}
+      <mesh scale={[0.85, 0.72, 1.0]} castShadow={!isWire}>
+        <sphereGeometry args={[0.44, 8, 6]} />
+        <meshStandardMaterial {...mats} />
+      </mesh>
+      {/* Head */}
+      <mesh position={[0, 0.28, 0.48]} castShadow={!isWire}>
+        <sphereGeometry args={[0.3, 8, 6]} />
+        <meshStandardMaterial {...mats} />
+      </mesh>
+      {/* Ears */}
+      <mesh position={[-0.14, 0.53, 0.42]} rotation={[0.2, 0, -0.15]}>
+        <coneGeometry args={[0.1, 0.22, 4]} />
+        <meshStandardMaterial {...mats} />
+      </mesh>
+      <mesh position={[0.14, 0.53, 0.42]} rotation={[0.2, 0, 0.15]}>
+        <coneGeometry args={[0.1, 0.22, 4]} />
+        <meshStandardMaterial {...mats} />
+      </mesh>
+      {/* Eyes */}
+      <mesh position={[-0.1, 0.31, 0.76]} scale={[0.6, 1, 0.3]}>
+        <sphereGeometry args={[0.07, 5, 5]} />
+        <meshStandardMaterial color={isWire ? palette.wire : CAT_EYE} wireframe={isWire} />
+      </mesh>
+      <mesh position={[0.1, 0.31, 0.76]} scale={[0.6, 1, 0.3]}>
+        <sphereGeometry args={[0.07, 5, 5]} />
+        <meshStandardMaterial color={isWire ? palette.wire : CAT_EYE} wireframe={isWire} />
+      </mesh>
+      {/* Nose */}
+      <mesh position={[0, 0.23, 0.78]}>
+        <sphereGeometry args={[0.035, 4, 4]} />
+        <meshStandardMaterial color={isWire ? palette.wire : CAT_NOSE} wireframe={isWire} />
+      </mesh>
+      {/* Tail — pivots at rear, sways Z-axis */}
+      <group ref={tailRef} position={[0, 0.12, -0.44]}>
+        <mesh position={[0, 0.16, -0.06]} rotation={[0.4, 0, 0]}>
+          <sphereGeometry args={[0.09, 6, 4]} />
+          <meshStandardMaterial {...mats} />
+        </mesh>
+        <mesh position={[0, 0.38, -0.16]} rotation={[0.7, 0, 0]}>
+          <sphereGeometry args={[0.075, 6, 4]} />
+          <meshStandardMaterial {...mats} />
+        </mesh>
+        <mesh position={[0, 0.55, -0.21]} rotation={[0.9, 0, 0]}>
+          <sphereGeometry args={[0.065, 6, 4]} />
+          <meshStandardMaterial {...mats} />
+        </mesh>
+        <mesh position={[0, 0.65, -0.17]}>
+          <sphereGeometry args={[0.055, 6, 4]} />
+          <meshStandardMaterial {...mats} />
+        </mesh>
+      </group>
+      {/* Legs — hip pivots for walk cycle */}
+      <group ref={fl} position={[-0.18, -0.1, 0.22]}>
+        <mesh position={[0, -0.22, 0]} castShadow={!isWire}>
+          <cylinderGeometry args={[0.055, 0.045, 0.44, 5]} />
+          <meshStandardMaterial {...mats} />
+        </mesh>
+      </group>
+      <group ref={fr} position={[0.18, -0.1, 0.22]}>
+        <mesh position={[0, -0.22, 0]} castShadow={!isWire}>
+          <cylinderGeometry args={[0.055, 0.045, 0.44, 5]} />
+          <meshStandardMaterial {...mats} />
+        </mesh>
+      </group>
+      <group ref={bl} position={[-0.18, -0.1, -0.22]}>
+        <mesh position={[0, -0.22, 0]} castShadow={!isWire}>
+          <cylinderGeometry args={[0.055, 0.045, 0.44, 5]} />
+          <meshStandardMaterial {...mats} />
+        </mesh>
+      </group>
+      <group ref={br} position={[0.18, -0.1, -0.22]}>
+        <mesh position={[0, -0.22, 0]} castShadow={!isWire}>
+          <cylinderGeometry args={[0.055, 0.045, 0.44, 5]} />
+          <meshStandardMaterial {...mats} />
+        </mesh>
+      </group>
+    </group>
+  )
+}
+
 const TREES = Array.from({ length: 40 }, (_, i) => {
   const angle = (i / 40) * Math.PI * 2
   const r = 6 + (i % 6) * 3.5
@@ -203,6 +341,7 @@ export default function App() {
         <CinematicCamera />
         <Terrain renderMode={renderMode} palette={palette} />
         {TREES.map((t, i) => <Tree key={i} x={t.x} z={t.z} renderMode={renderMode} palette={palette} />)}
+        <Cat renderMode={renderMode} palette={palette} />
       </Canvas>
     </div>
   )
