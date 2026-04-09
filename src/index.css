@@ -4,9 +4,14 @@
   box-sizing: border-box;
 }
 
+html {
+  background: #0a0a0a;
+}
+
 body {
   overflow: hidden;
   min-height: 100dvh;
+  background: #0a0a0a;
 }
 
 :root {
