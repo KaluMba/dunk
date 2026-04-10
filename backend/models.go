@@ -129,6 +129,18 @@ type RegisteredPlayer struct {
 	LastActive time.Time
 }
 
+func (p *RegisteredPlayer) registryEntry() RegistryEntry {
+	return RegistryEntry{
+		ID:         p.ID,
+		Username:   p.Username,
+		MainChars:  p.MainChars,
+		Stats:      p.Stats,
+		Rank:       p.Rank,
+		Region:     p.Region,
+		LastActive: p.LastActive,
+	}
+}
+
 func (p *RegisteredPlayer) public() PublicProfile {
 	return PublicProfile{
 		ID:         p.ID,
@@ -158,15 +170,27 @@ func (p *RegisteredPlayer) matchScore(targets []string) int {
 // ── HTTP request/response bodies ────────────────────────────────────────────
 
 type RegisterRequest struct {
-	Username string `json:"username"`
-	Rank     string `json:"rank"`
-	Region   string `json:"region"`
+	Username       string   `json:"username"`
+	Rank           string   `json:"rank"`
+	Region         string   `json:"region"`
+	MainCharacters []string `json:"mainCharacters"` // user-selected mains from the UI
 }
 
 type RegisterResponse struct {
 	PlayerID   string                     `json:"playerId"`
 	MainChars  []string                   `json:"mainCharacters"`
 	Stats      map[string]*CharacterStats `json:"stats"`
+	LastActive time.Time                  `json:"lastActive"`
+}
+
+// RegistryEntry is what GET /api/players returns — username is public.
+type RegistryEntry struct {
+	ID         string                     `json:"id"`
+	Username   string                     `json:"username"`
+	MainChars  []string                   `json:"mainCharacters"`
+	Stats      map[string]*CharacterStats `json:"stats"`
+	Rank       string                     `json:"rank,omitempty"`
+	Region     string                     `json:"region,omitempty"`
 	LastActive time.Time                  `json:"lastActive"`
 }
 

@@ -31,7 +31,7 @@ func AggregateStats(matches []APIMatch) map[string]*CharacterStats {
 
 	for _, m := range matches {
 		h := m.MatchPlayer.PlayerHero
-		name := strings.TrimSpace(h.HeroName)
+		name := titleCase(strings.TrimSpace(h.HeroName))
 		if name == "" {
 			continue
 		}
@@ -174,6 +174,17 @@ func (m *MockRivalsClient) FetchMatches(uid string, limit int) ([]APIMatch, erro
 		}
 	}
 	return matches, nil
+}
+
+// titleCase converts API hero names to display format: "iron man" → "Iron Man"
+func titleCase(s string) string {
+	words := strings.Fields(s)
+	for i, w := range words {
+		if len(w) > 0 {
+			words[i] = strings.ToUpper(w[:1]) + strings.ToLower(w[1:])
+		}
+	}
+	return strings.Join(words, " ")
 }
 
 func hash32(s string) uint32 {

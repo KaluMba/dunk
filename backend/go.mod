@@ -1,3 +1,5 @@
 module github.com/kalumba/dunk/backend
 
 go 1.22
+
+require github.com/lib/pq v1.12.3 // indirect

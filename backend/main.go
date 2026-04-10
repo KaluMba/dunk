@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -23,11 +24,36 @@ func main() {
 		log.Println("using mock rivals client (set RIVALS_API_KEY for live data)")
 	}
 
-	store = NewStore()
+	// Open PostgreSQL if DATABASE_URL is set; fall back to in-memory.
+	var db *sql.DB
+	if dbURL := os.Getenv("DATABASE_URL"); dbURL != "" {
+		var err error
+		db, err = openDB(dbURL)
+		if err != nil {
+			log.Printf("database connection failed: %v — running in-memory (data resets on restart)", err)
+			db = nil
+		}
+	} else {
+		log.Println("DATABASE_URL not set — running in-memory (data resets on restart)")
+	}
+
+	store = NewStore(db)
+
+	// Restore players from DB if connected.
+	if db != nil {
+		players, err := dbLoad(db)
+		if err != nil {
+			log.Printf("load players from db: %v", err)
+		} else {
+			store.LoadAll(players)
+			log.Printf("loaded %d players from database", len(players))
+		}
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/characters", handleCharacters)
 	mux.HandleFunc("POST /api/register", handleRegister)
+	mux.HandleFunc("GET /api/players", handlePlayers)
 	mux.HandleFunc("GET /api/search", handleSearch)
 	mux.HandleFunc("POST /api/reveal/{id}", handleReveal)
 	mux.HandleFunc("GET /api/player/{id}", handlePlayer)
@@ -84,9 +110,51 @@ func handleCharacters(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, allCharacters)
 }
 
+// GET /api/players — all registry entries, usernames visible
+func handlePlayers(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, store.All())
+}
+
+// GET /api/search?characters=Storm,Hela&exclude=rival-xxxx
+func handleSearch(w http.ResponseWriter, r *http.Request) {
+	raw := strings.TrimSpace(r.URL.Query().Get("characters"))
+	if raw == "" {
+		writeError(w, "characters query param required", http.StatusBadRequest)
+		return
+	}
+	var targets []string
+	for _, p := range strings.Split(raw, ",") {
+		if t := strings.TrimSpace(p); t != "" {
+			targets = append(targets, t)
+		}
+	}
+	exclude := strings.TrimSpace(r.URL.Query().Get("exclude"))
+	writeJSON(w, store.Search(targets, exclude))
+}
+
+// POST /api/reveal/{id}
+func handleReveal(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	username := store.Reveal(id)
+	if username == "" {
+		writeError(w, "player not found", http.StatusNotFound)
+		return
+	}
+	writeJSON(w, map[string]string{"username": username})
+}
+
+// GET /api/player/{id}
+func handlePlayer(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	p, ok := store.Get(id)
+	if !ok {
+		writeError(w, "player not found", http.StatusNotFound)
+		return
+	}
+	writeJSON(w, p.public())
+}
+
 // POST /api/register
-// Body: { username, rank?, region? }
-// Returns: RegisterResponse (player ID, detected mains, stats, last active)
 func handleRegister(w http.ResponseWriter, r *http.Request) {
 	var req RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -99,7 +167,6 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify player and get UID
 	profile, err := rivals.FindPlayer(req.Username)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
@@ -110,16 +177,19 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fetch recent match history for stat aggregation
 	matches, err := rivals.FetchMatches(profile.UID, 20)
 	if err != nil {
 		log.Printf("fetch matches for %s: %v", req.Username, err)
-		// Non-fatal: register with empty stats
 		matches = nil
 	}
 
 	stats := AggregateStats(matches)
-	mains := TopMains(stats, 3)
+
+	// Use user-selected characters as mains if provided; otherwise auto-detect.
+	mains := req.MainCharacters
+	if len(mains) == 0 {
+		mains = TopMains(stats, 3)
+	}
 
 	lastActive := time.Now()
 	if len(matches) > 0 {
@@ -144,49 +214,4 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		Stats:      stats,
 		LastActive: lastActive,
 	})
-}
-
-// GET /api/search?characters=Storm,Hela&exclude=rival-xxxx
-// Returns anonymous profiles ranked by match score.
-func handleSearch(w http.ResponseWriter, r *http.Request) {
-	raw := strings.TrimSpace(r.URL.Query().Get("characters"))
-	if raw == "" {
-		writeError(w, "characters query param required", http.StatusBadRequest)
-		return
-	}
-	parts := strings.Split(raw, ",")
-	targets := make([]string, 0, len(parts))
-	for _, p := range parts {
-		if t := strings.TrimSpace(p); t != "" {
-			targets = append(targets, t)
-		}
-	}
-
-	exclude := strings.TrimSpace(r.URL.Query().Get("exclude"))
-	results := store.Search(targets, exclude)
-	writeJSON(w, results)
-}
-
-// POST /api/reveal/{id}
-// Returns { username } — the real name behind an anonymous profile.
-func handleReveal(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	username := store.Reveal(id)
-	if username == "" {
-		writeError(w, "player not found", http.StatusNotFound)
-		return
-	}
-	writeJSON(w, map[string]string{"username": username})
-}
-
-// GET /api/player/{id}
-// Returns the full public profile for a single player (no username).
-func handlePlayer(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	p, ok := store.Get(id)
-	if !ok {
-		writeError(w, "player not found", http.StatusNotFound)
-		return
-	}
-	writeJSON(w, p.public())
 }
