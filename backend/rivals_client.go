@@ -7,12 +7,14 @@ import (
 	"hash/fnv"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"net/url"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 )
 
 // ── Interface ────────────────────────────────────────────────────────────────
@@ -176,15 +178,20 @@ func (m *MockRivalsClient) FetchMatches(uid string, limit int) ([]APIMatch, erro
 	return matches, nil
 }
 
-// titleCase converts API hero names to display format: "iron man" → "Iron Man"
+// titleCase converts API hero names to display format: "iron man" → "Iron Man",
+// "star-lord" → "Star-Lord". Capitalises after spaces and hyphens.
 func titleCase(s string) string {
-	words := strings.Fields(s)
-	for i, w := range words {
-		if len(w) > 0 {
-			words[i] = strings.ToUpper(w[:1]) + strings.ToLower(w[1:])
+	runes := []rune(strings.ToLower(s))
+	capNext := true
+	for i, r := range runes {
+		if r == ' ' || r == '-' {
+			capNext = true
+		} else if capNext {
+			runes[i] = unicode.ToUpper(r)
+			capNext = false
 		}
 	}
-	return strings.Join(words, " ")
+	return string(runes)
 }
 
 func hash32(s string) uint32 {
@@ -278,14 +285,57 @@ func (c *LiveRivalsClient) FindPlayer(username string) (*apiFindPlayerResp, erro
 	return &r, nil
 }
 
+// apiFullPlayerResp is the shape returned by GET /api/v1/player/{uid}.
+// This endpoint returns full profile data including match history.
+type apiFullPlayerResp struct {
+	MatchHistory []apiFullMatch `json:"match_history"`
+}
+
+type apiFullMatch struct {
+	MatchUID    string      `json:"match_uid"`
+	Duration    float64     `json:"duration"`
+	Timestamp   int64       `json:"match_time_stamp"`
+	Performance apiFullPerf `json:"player_performance"`
+}
+
+type apiFullPerf struct {
+	HeroName string    `json:"hero_name"`
+	Kills    int64     `json:"kills"`
+	Deaths   int64     `json:"deaths"`
+	Assists  int64     `json:"assists"`
+	Damage   FlexInt64 `json:"total_hero_damage"`
+	Healing  FlexInt64 `json:"total_hero_heal"`
+	IsWin    FlexBool  `json:"is_win"`
+}
+
 func (c *LiveRivalsClient) FetchMatches(uid string, limit int) ([]APIMatch, error) {
-	endpoint := fmt.Sprintf(
-		"https://marvelrivalsapi.com/api/v1/player/%s/match-history?season=1&limit=%d",
-		url.PathEscape(uid), limit,
-	)
-	var r apiMatchHistoryResp
+	endpoint := fmt.Sprintf("https://marvelrivalsapi.com/api/v1/player/%s", url.PathEscape(uid))
+	var r apiFullPlayerResp
 	if err := c.get(endpoint, &r); err != nil {
 		return nil, err
 	}
-	return r.MatchHistory, nil
+	matches := make([]APIMatch, 0, len(r.MatchHistory))
+	for i, m := range r.MatchHistory {
+		if i >= limit {
+			break
+		}
+		matches = append(matches, APIMatch{
+			MatchUID:  m.MatchUID,
+			Timestamp: m.Timestamp,
+			MatchPlayer: APIMatchPlayer{
+				IsWin:     m.Performance.IsWin,
+				PlayerUID: FlexString(uid),
+				PlayerHero: APIPlayerHero{
+					HeroName: m.Performance.HeroName,
+					Kills:    m.Performance.Kills,
+					Deaths:   m.Performance.Deaths,
+					Assists:  m.Performance.Assists,
+					PlayTime: FlexInt64(int64(math.Round(m.Duration))),
+					Damage:   m.Performance.Damage,
+					Healing:  m.Performance.Healing,
+				},
+			},
+		})
+	}
+	return matches, nil
 }

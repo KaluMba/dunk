@@ -9,7 +9,7 @@ import (
 )
 
 // FlexBool unmarshals JSON booleans, ints (0/1), strings, AND objects gracefully.
-// MarvelRivalsAPI occasionally sends is_win as a non-standard type.
+// MarvelRivalsAPI sends is_win as bool, int, string, or {score,is_win} object.
 type FlexBool bool
 
 func (b *FlexBool) UnmarshalJSON(data []byte) error {
@@ -28,7 +28,14 @@ func (b *FlexBool) UnmarshalJSON(data []byte) error {
 		*b = FlexBool(s == "1" || s == "true" || s == "True" || s == "yes")
 		return nil
 	}
-	// Object, null, or unknown — treat as false (draw / no-win).
+	// Object like {"score":1,"is_win":true} — extract the is_win field.
+	var obj struct {
+		IsWin bool `json:"is_win"`
+	}
+	if err := json.Unmarshal(data, &obj); err == nil {
+		*b = FlexBool(obj.IsWin)
+		return nil
+	}
 	*b = false
 	return nil
 }
@@ -267,6 +274,9 @@ var allCharacters = []Character{
 	{ID: "the-punisher", Name: "The Punisher", Role: "duelist"},
 	{ID: "winter-soldier", Name: "Winter Soldier", Role: "duelist"},
 	{ID: "wolverine", Name: "Wolverine", Role: "duelist"},
+	{ID: "emma-frost", Name: "Emma Frost", Role: "duelist"},
+	{ID: "ultron", Name: "Ultron", Role: "duelist"},
+	{ID: "rogue", Name: "Rogue", Role: "duelist"},
 	// Strategists
 	{ID: "adam-warlock", Name: "Adam Warlock", Role: "strategist"},
 	{ID: "cloak-dagger", Name: "Cloak & Dagger", Role: "strategist"},
