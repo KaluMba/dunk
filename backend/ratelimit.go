@@ -31,14 +31,15 @@ func NewRateLimiter() *RateLimiter {
 	return rl
 }
 
-func (rl *RateLimiter) allow(ip string, limit int, window time.Duration) bool {
+// allow checks whether the given key (ip or ip+endpoint bucket) is within its limit.
+func (rl *RateLimiter) allow(key string, limit int, window time.Duration) bool {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
 	now := time.Now()
-	w, ok := rl.windows[ip]
+	w, ok := rl.windows[key]
 	if !ok || now.After(w.resetAt) {
-		rl.windows[ip] = &ipWindow{count: 1, resetAt: now.Add(window)}
+		rl.windows[key] = &ipWindow{count: 1, resetAt: now.Add(window)}
 		return true
 	}
 	if w.count >= limit {
@@ -86,11 +87,13 @@ func rateLimitMiddleware(rl *RateLimiter) func(http.Handler) http.Handler {
 				return
 			}
 			ip := realIP(r)
-			limit, window := 60, time.Minute // default: 60 req/min
+			// Each endpoint bucket is tracked separately so /api/register's
+			// strict limit doesn't consume quota from general endpoints.
+			key, limit, window := ip, 60, time.Minute
 			if r.URL.Path == "/api/register" {
-				limit, window = 5, time.Minute // register: 5/min per IP
+				key, limit = ip+"|reg", 10 // 10 registrations/min per IP
 			}
-			if !rl.allow(ip, limit, window) {
+			if !rl.allow(key, limit, window) {
 				writeError(w, "rate limit exceeded — slow down", http.StatusTooManyRequests)
 				return
 			}

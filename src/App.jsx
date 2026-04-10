@@ -390,10 +390,11 @@ export default function App() {
         <button
           style={{
             position: 'absolute', bottom: 24, right: 24, zIndex: 20,
-            color: 'rgba(255,255,255,0.3)', fontSize: 10, fontFamily: "'Syne', sans-serif",
-            fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase',
-            background: 'none', border: '1px solid rgba(255,255,255,0.1)',
-            padding: '7px 14px', cursor: 'pointer',
+            color: 'rgba(255,255,255,0.35)', fontSize: 10,
+            fontFamily: "'Space Grotesk', system-ui, sans-serif",
+            fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase',
+            background: 'none', border: '1px solid rgba(255,255,255,0.12)',
+            padding: '8px 16px', cursor: 'pointer',
             pointerEvents: 'all',
           }}
           onClick={openRivals}

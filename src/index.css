@@ -80,6 +80,21 @@ body {
   50%       { transform: translateX(5px); }
 }
 
+/* ── Mobile: full-screen glass, scene shows behind ───────────────────────── */
+@media (max-width: 640px) {
+  /* Panel takes full width but stays glassy so scene shows behind */
+  .rivals-panel {
+    max-width: 100% !important;
+    /* Uniform glass — gradient not needed at full width */
+    background: rgba(4, 3, 10, 0.72) !important;
+  }
+  /* Stronger blur on mobile so scene is visible but readable */
+  .rivals-panel {
+    backdrop-filter: blur(40px) saturate(1.8) !important;
+    -webkit-backdrop-filter: blur(40px) saturate(1.8) !important;
+  }
+}
+
 /* ── Rivals overlay animations ────────────────────────────────────────────── */
 
 @keyframes rivalsFadeIn {
