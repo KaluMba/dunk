@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 
-const API = import.meta.env.VITE_RIVALS_API ?? 'http://localhost:8080'
+// Auto-prefix with https:// if the env var was set without a protocol
+const _rawApi = import.meta.env.VITE_RIVALS_API ?? ''
+const API = _rawApi
+  ? (_rawApi.startsWith('http') ? _rawApi : `https://${_rawApi}`)
+  : 'http://localhost:8080'
 const RANKS   = ['Bronze','Silver','Gold','Platinum','Diamond','Celestial','One Above All']
 const REGIONS = ['NA-East','NA-West','EU','Asia','SA','OCE']
 const FREE_REVEALS = 3
@@ -276,8 +280,8 @@ export default function RivalsOverlay({ onClose }) {
     : characters.filter(c => c.role === roleFilter)
 
   return (
-    <div style={s.backdrop} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={s.panel} className="rivals-panel">
+    <div style={s.backdrop} onClick={onClose}>
+      <div style={s.panel} className="rivals-panel" onClick={e => e.stopPropagation()}>
 
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <div style={s.header}>
@@ -463,29 +467,30 @@ const AD = 'rgba(200,149,42,0.14)'
 const T  = '#ede8df'          // warm white
 const TD = '#6b6458'          // dim
 const TDD= '#302c26'          // very dim
-const BDR= 'rgba(255,255,255,0.06)'
+const BDR= 'rgba(255,255,255,0.07)'
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const s = {
-  // Backdrop — darkens the left side where 3D shows through
+  // Full-screen backdrop — transparent so 3D scene shows everywhere
   backdrop: {
     position: 'fixed', inset: 0, zIndex: 100,
-    background: 'rgba(0,0,0,0.25)',
     display: 'flex', justifyContent: 'flex-end',
     animation: 'rivalsFadeIn 0.25s ease',
   },
 
-  // Main panel — slides in from right
+  // Glass panel — slides in from right, transparent so scene bleeds through
   panel: {
-    width: '100%', maxWidth: 620, height: '100dvh',
-    background: 'rgba(6,5,14,0.96)',
-    backdropFilter: 'blur(32px) saturate(1.8)',
+    width: '100%', maxWidth: 580, height: '100dvh',
+    // Gradient: transparent on left edge → dark glass on right
+    background: 'linear-gradient(to right, rgba(4,3,10,0) 0%, rgba(4,3,10,0.72) 48px, rgba(4,3,10,0.82) 100%)',
+    backdropFilter: 'blur(28px) saturate(1.6)',
+    WebkitBackdropFilter: 'blur(28px) saturate(1.6)',
     display: 'flex', flexDirection: 'column',
     fontFamily: "'Syne', system-ui, sans-serif",
     color: T,
-    borderLeft: `1px solid rgba(200,149,42,0.12)`,
-    animation: 'rivalsPanelIn 0.35s cubic-bezier(0.16,1,0.3,1)',
+    // No hard left border — gradient handles the fade
+    animation: 'rivalsPanelIn 0.38s cubic-bezier(0.16,1,0.3,1)',
   },
 
   // Header

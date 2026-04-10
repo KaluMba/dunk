@@ -47,37 +47,37 @@ body {
 
 .scene-cinematic {
   filter: contrast(1.06) saturate(1.25);
-  animation: sceneGlitch 8s infinite;
+  animation: sceneGlitch 9s infinite;
 }
 
 @keyframes sceneGlitch {
   0%, 91%, 100% { transform: none; filter: contrast(1.06) saturate(1.25); }
-  92%  { transform: translateX(-3px); filter: contrast(1.2) saturate(2) hue-rotate(8deg); clip-path: inset(28% 0 60% 0); }
-  93%  { transform: translateX(3px);  filter: contrast(1.2) saturate(2) hue-rotate(-8deg); clip-path: inset(62% 0 25% 0); }
-  94%  { transform: none; clip-path: none; filter: contrast(1.06) saturate(1.25); }
+  92%  { transform: translateX(-3px) skewX(-0.3deg); filter: contrast(1.3) saturate(2.2) hue-rotate(10deg); }
+  93%  { transform: translateX(4px)  skewX(0.3deg);  filter: contrast(1.3) saturate(2.2) hue-rotate(-10deg); }
+  94%  { transform: translateX(-1px); filter: contrast(1.06) saturate(1.25); }
 }
 
 .chroma-r {
   position: absolute; inset: 0; pointer-events: none; z-index: 2;
-  background: rgba(255, 10, 60, 0.06);
+  background: rgba(255, 10, 60, 0.04);
   mix-blend-mode: screen;
   animation: chromaRed 3s ease-in-out infinite;
 }
 .chroma-b {
   position: absolute; inset: 0; pointer-events: none; z-index: 2;
-  background: rgba(10, 60, 255, 0.06);
+  background: rgba(10, 60, 255, 0.04);
   mix-blend-mode: screen;
   animation: chromaBlue 3s ease-in-out infinite;
   animation-delay: -1.5s;
 }
 
 @keyframes chromaRed {
-  0%, 100% { transform: translateX(-2px) scaleX(1.002); opacity: 0.7; }
-  50%       { transform: translateX(-5px) scaleX(1.004); opacity: 1; }
+  0%, 100% { transform: translateX(-2px); }
+  50%       { transform: translateX(-5px); }
 }
 @keyframes chromaBlue {
-  0%, 100% { transform: translateX(2px) scaleX(1.002); opacity: 0.7; }
-  50%       { transform: translateX(5px) scaleX(1.004); opacity: 1; }
+  0%, 100% { transform: translateX(2px); }
+  50%       { transform: translateX(5px); }
 }
 
 /* ── Rivals overlay animations ────────────────────────────────────────────── */
