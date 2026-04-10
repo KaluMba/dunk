@@ -47,9 +47,9 @@ func AggregateStats(matches []APIMatch) map[string]*CharacterStats {
 		cs.Kills += h.Kills
 		cs.Deaths += h.Deaths
 		cs.Assists += h.Assists
-		cs.PlaytimeS += parsePlayTime(h.PlayTime)
-		cs.Damage += h.Damage
-		cs.Healing += h.Healing
+		cs.PlaytimeS += int64(h.PlayTime)
+		cs.Damage += int64(h.Damage)
+		cs.Healing += int64(h.Healing)
 	}
 
 	for _, cs := range stats {
@@ -160,15 +160,15 @@ func (m *MockRivalsClient) FetchMatches(uid string, limit int) ([]APIMatch, erro
 			Timestamp: time.Now().Add(-time.Duration(i*3) * time.Hour).Unix(),
 			MatchPlayer: APIMatchPlayer{
 				IsWin:     FlexBool(isWin),
-				PlayerUID: uid,
+				PlayerUID: FlexString(uid),
 				PlayerHero: APIPlayerHero{
 					HeroName: hero,
 					Kills:    kills,
 					Deaths:   deaths,
 					Assists:  assists,
-					PlayTime: fmt.Sprintf("%d", 600+i*40), // ~10–23 min
-					Damage:   int64(20000 + i*800),
-					Healing:  int64(i * 200),
+					PlayTime: FlexInt64(600 + i*40), // ~10–23 min
+					Damage:   FlexInt64(20000 + i*800),
+					Healing:  FlexInt64(i * 200),
 				},
 			},
 		}

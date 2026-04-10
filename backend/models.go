@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"math"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -28,6 +30,42 @@ func (b *FlexBool) UnmarshalJSON(data []byte) error {
 	}
 	// Object, null, or unknown — treat as false (draw / no-win).
 	*b = false
+	return nil
+}
+
+// FlexInt64 unmarshals JSON floats, ints, and numeric strings into int64.
+// Needed because MarvelRivalsAPI sends play_time and damage as floats.
+type FlexInt64 int64
+
+func (n *FlexInt64) UnmarshalJSON(data []byte) error {
+	var f float64
+	if err := json.Unmarshal(data, &f); err == nil {
+		*n = FlexInt64(int64(math.Round(f)))
+		return nil
+	}
+	var s string
+	if json.Unmarshal(data, &s) == nil {
+		s = strings.TrimSpace(s)
+		if f, err := strconv.ParseFloat(s, 64); err == nil {
+			*n = FlexInt64(int64(math.Round(f)))
+			return nil
+		}
+		*n = FlexInt64(parsePlayTime(s)) // MM:SS / HH:MM:SS
+	}
+	return nil
+}
+
+// FlexString unmarshals any JSON scalar (string, number) into a string.
+// Needed because MarvelRivalsAPI sends player_uid as a number.
+type FlexString string
+
+func (s *FlexString) UnmarshalJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err == nil {
+		*s = FlexString(str)
+		return nil
+	}
+	*s = FlexString(string(data)) // number or other — store raw
 	return nil
 }
 
@@ -152,18 +190,18 @@ type APIMatch struct {
 
 type APIMatchPlayer struct {
 	IsWin      FlexBool      `json:"is_win"`
-	PlayerUID  string        `json:"player_uid"`
+	PlayerUID  FlexString    `json:"player_uid"` // API sends as number
 	PlayerHero APIPlayerHero `json:"player_hero"`
 }
 
 type APIPlayerHero struct {
-	HeroName  string `json:"hero_name"`
-	Kills     int64  `json:"kills"`
-	Deaths    int64  `json:"deaths"`
-	Assists   int64  `json:"assists"`
-	PlayTime  string `json:"play_time"` // string — see parsePlayTime
-	Damage    int64  `json:"total_hero_damage"`
-	Healing   int64  `json:"total_hero_heal"`
+	HeroName string    `json:"hero_name"`
+	Kills    int64     `json:"kills"`
+	Deaths   int64     `json:"deaths"`
+	Assists  int64     `json:"assists"`
+	PlayTime FlexInt64 `json:"play_time"`         // API sends as float seconds
+	Damage   FlexInt64 `json:"total_hero_damage"` // API sends as float
+	Healing  FlexInt64 `json:"total_hero_heal"`   // API sends as float
 }
 
 // ── Character roster ─────────────────────────────────────────────────────────

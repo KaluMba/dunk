@@ -39,19 +39,19 @@ func TestParsePlayTime_Whitespace(t *testing.T) {
 
 // ── AggregateStats ────────────────────────────────────────────────────────────
 
-func match(hero string, win bool, k, d, a int64, playSecs string) APIMatch {
+func match(hero string, win bool, k, d, a int64, playSecs int64) APIMatch {
 	return APIMatch{
 		MatchUID:  "test-uid",
 		Timestamp: time.Now().Unix(),
 		MatchPlayer: APIMatchPlayer{
 			IsWin:     FlexBool(win),
-			PlayerUID: "player-1",
+			PlayerUID: FlexString("player-1"),
 			PlayerHero: APIPlayerHero{
 				HeroName: hero,
 				Kills:    k,
 				Deaths:   d,
 				Assists:  a,
-				PlayTime: playSecs,
+				PlayTime: FlexInt64(playSecs),
 				Damage:   10000,
 				Healing:  0,
 			},
@@ -68,9 +68,9 @@ func TestAggregateStats_Empty(t *testing.T) {
 
 func TestAggregateStats_SingleHero(t *testing.T) {
 	matches := []APIMatch{
-		match("Storm", true, 10, 2, 8, "600"),
-		match("Storm", false, 5, 4, 6, "720"),
-		match("Storm", true, 12, 3, 9, "680"),
+		match("Storm", true, 10, 2, 8, 600),
+		match("Storm", false, 5, 4, 6, 720),
+		match("Storm", true, 12, 3, 9, 680),
 	}
 	stats := AggregateStats(matches)
 
@@ -105,9 +105,9 @@ func TestAggregateStats_SingleHero(t *testing.T) {
 
 func TestAggregateStats_MultipleHeroes(t *testing.T) {
 	matches := []APIMatch{
-		match("Storm", true, 8, 2, 6, "600"),
-		match("Hela", false, 6, 5, 4, "700"),
-		match("Storm", true, 10, 3, 8, "650"),
+		match("Storm", true, 8, 2, 6, 600),
+		match("Hela", false, 6, 5, 4, 700),
+		match("Storm", true, 10, 3, 8, 650),
 	}
 	stats := AggregateStats(matches)
 
@@ -124,7 +124,7 @@ func TestAggregateStats_MultipleHeroes(t *testing.T) {
 
 func TestAggregateStats_ZeroDeaths(t *testing.T) {
 	matches := []APIMatch{
-		match("Thor", true, 10, 0, 5, "500"),
+		match("Thor", true, 10, 0, 5, 500),
 	}
 	stats := AggregateStats(matches)
 	// KDA with 0 deaths treated as 1 death: (10+5)/1 = 15
@@ -136,8 +136,8 @@ func TestAggregateStats_ZeroDeaths(t *testing.T) {
 
 func TestAggregateStats_SkipsBlankHero(t *testing.T) {
 	matches := []APIMatch{
-		match("", true, 5, 2, 3, "400"),
-		match("Storm", true, 8, 2, 6, "600"),
+		match("", true, 5, 2, 3, 400),
+		match("Storm", true, 8, 2, 6, 600),
 	}
 	stats := AggregateStats(matches)
 	if len(stats) != 1 {
