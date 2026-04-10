@@ -1,8 +1,12 @@
-import { useRef, useMemo, useState, useCallback } from 'react'
+import { useRef, useMemo, useState, useCallback, useEffect } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { PALETTES, LIGHTINGS, FOGS, RENDER_MODES } from './theme'
 import { startMusic } from './music'
+import RivalsOverlay from './RivalsApp.jsx'
+
+// Module-level time scale — set to near-zero when rivals overlay is open
+export const timeScale = { current: 1 }
 
 function heightAt(x, z) {
   return (
@@ -141,7 +145,8 @@ function Cat({ renderMode, palette }) {
   const timer  = useRef(Math.random() * 2)
   const phase  = useRef(0)
 
-  useFrame((_, delta) => {
+  useFrame((_, rawDelta) => {
+    const delta = rawDelta * timeScale.current
     timer.current += delta
 
     if (timer.current > 2.5 + Math.random() * 4) {
@@ -289,7 +294,8 @@ function CinematicCamera() {
   const origin = useRef(new THREE.Vector3(...SHOTS[0].start))
   const target = useRef(new THREE.Vector3(...SHOTS[0].look))
 
-  useFrame((_, delta) => {
+  useFrame((_, rawDelta) => {
+    const delta = rawDelta * timeScale.current
     const shot = SHOTS[index.current]
     elapsed.current += delta
     const t = easeInOut(Math.min(elapsed.current / shot.duration, 1))
@@ -315,78 +321,104 @@ function CinematicCamera() {
 
 export default function App() {
   const [variant, setVariant] = useState(nextVariant)
+  const [rivalsOpen, setRivalsOpen] = useState(false)
   const musicStarted = useRef(false)
 
+  // Slow 3D to near-stop when overlay is open
+  useEffect(() => {
+    timeScale.current = rivalsOpen ? 0.04 : 1
+  }, [rivalsOpen])
+
   const handleClick = useCallback(() => {
+    if (rivalsOpen) return
     if (!musicStarted.current) {
       startMusic()
       musicStarted.current = true
     }
     setVariant(nextVariant())
+  }, [rivalsOpen])
+
+  const openRivals = useCallback((e) => {
+    e.stopPropagation()
+    if (!musicStarted.current) {
+      startMusic()
+      musicStarted.current = true
+    }
+    setRivalsOpen(true)
   }, [])
 
   const { renderMode, palette, lighting, fog } = variant
 
   return (
-    <div
-      className="letterbox"
-      style={{ width: '100dvw', height: '100dvh', cursor: 'pointer', position: 'relative' }}
-      onClick={handleClick}
-    >
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 10,
-        pointerEvents: 'none',
-        fontFamily: "'Syne', sans-serif",
-        fontWeight: 800,
-        fontSize: 'clamp(5rem, 22vw, 20rem)',
-        letterSpacing: '-0.03em',
-        lineHeight: 1,
-        background: `repeating-linear-gradient(
-          -55deg,
-          rgba(255,255,255,0.95) 0px,
-          rgba(255,255,255,0.95) 2px,
-          rgba(255,255,255,0.08) 2px,
-          rgba(255,255,255,0.08) 12px
-        )`,
-        WebkitBackgroundClip: 'text',
-        backgroundClip: 'text',
-        color: 'transparent',
-        mixBlendMode: 'overlay',
-      }}>
-        dunk
-      </div>
-      <a
-        href="#rivals"
-        style={{
-          position: 'absolute', bottom: 24, right: 24, zIndex: 20,
-          color: 'rgba(255,255,255,0.25)', fontSize: 11, fontFamily: "'Syne', sans-serif",
-          fontWeight: 700, letterSpacing: '0.1em', textDecoration: 'none', textTransform: 'uppercase',
-          pointerEvents: 'all',
-        }}
-        onClick={e => e.stopPropagation()}
+    <>
+      <div
+        className={`letterbox${rivalsOpen ? ' scene-cinematic' : ''}`}
+        style={{ width: '100dvw', height: '100dvh', cursor: rivalsOpen ? 'default' : 'pointer', position: 'relative' }}
+        onClick={handleClick}
       >
-        find teammates →
-      </a>
-      <Canvas shadows camera={{ position: [0, 32, 42], fov: 60 }}>
-        <color attach="background" args={[palette.bg]} />
-        <fog attach="fog" color={palette.bg} near={fog.near} far={fog.far} />
-        <ambientLight intensity={lighting.ambient} />
-        <directionalLight
-          position={lighting.pos}
-          intensity={lighting.intensity}
-          color={lighting.color}
-          castShadow
-        />
-        <CinematicCamera />
-        <Terrain renderMode={renderMode} palette={palette} />
-        {TREES.map((t, i) => <Tree key={i} x={t.x} z={t.z} renderMode={renderMode} palette={palette} />)}
-        <Cat renderMode={renderMode} palette={palette} />
-      </Canvas>
-    </div>
+        {/* Chromatic aberration overlays — only when rivals is open */}
+        {rivalsOpen && <><div className="chroma-r" /><div className="chroma-b" /></>}
+
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10,
+          pointerEvents: 'none',
+          fontFamily: "'Syne', sans-serif",
+          fontWeight: 800,
+          fontSize: 'clamp(5rem, 22vw, 20rem)',
+          letterSpacing: '-0.03em',
+          lineHeight: 1,
+          background: `repeating-linear-gradient(
+            -55deg,
+            rgba(255,255,255,0.95) 0px,
+            rgba(255,255,255,0.95) 2px,
+            rgba(255,255,255,0.08) 2px,
+            rgba(255,255,255,0.08) 12px
+          )`,
+          WebkitBackgroundClip: 'text',
+          backgroundClip: 'text',
+          color: 'transparent',
+          mixBlendMode: 'overlay',
+        }}>
+          dunk
+        </div>
+
+        <button
+          style={{
+            position: 'absolute', bottom: 24, right: 24, zIndex: 20,
+            color: 'rgba(255,255,255,0.3)', fontSize: 10, fontFamily: "'Syne', sans-serif",
+            fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase',
+            background: 'none', border: '1px solid rgba(255,255,255,0.1)',
+            padding: '7px 14px', cursor: 'pointer',
+            pointerEvents: 'all',
+          }}
+          onClick={openRivals}
+        >
+          RIVALS ›
+        </button>
+
+        <Canvas shadows camera={{ position: [0, 32, 42], fov: 60 }}>
+          <color attach="background" args={[palette.bg]} />
+          <fog attach="fog" color={palette.bg} near={fog.near} far={fog.far} />
+          <ambientLight intensity={lighting.ambient} />
+          <directionalLight
+            position={lighting.pos}
+            intensity={lighting.intensity}
+            color={lighting.color}
+            castShadow
+          />
+          <CinematicCamera />
+          <Terrain renderMode={renderMode} palette={palette} />
+          {TREES.map((t, i) => <Tree key={i} x={t.x} z={t.z} renderMode={renderMode} palette={palette} />)}
+          <Cat renderMode={renderMode} palette={palette} />
+        </Canvas>
+      </div>
+
+      {rivalsOpen && <RivalsOverlay onClose={() => setRivalsOpen(false)} />}
+    </>
   )
 }

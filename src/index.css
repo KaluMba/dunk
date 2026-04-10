@@ -42,3 +42,87 @@ body {
   bottom: 0;
   background: linear-gradient(to top, var(--color-background) 0%, transparent 100%);
 }
+
+/* ── Cinematic slow-mo + chromatic aberration ─────────────────────────────── */
+
+.scene-cinematic {
+  filter: contrast(1.06) saturate(1.25);
+  animation: sceneGlitch 8s infinite;
+}
+
+@keyframes sceneGlitch {
+  0%, 91%, 100% { transform: none; filter: contrast(1.06) saturate(1.25); }
+  92%  { transform: translateX(-3px); filter: contrast(1.2) saturate(2) hue-rotate(8deg); clip-path: inset(28% 0 60% 0); }
+  93%  { transform: translateX(3px);  filter: contrast(1.2) saturate(2) hue-rotate(-8deg); clip-path: inset(62% 0 25% 0); }
+  94%  { transform: none; clip-path: none; filter: contrast(1.06) saturate(1.25); }
+}
+
+.chroma-r {
+  position: absolute; inset: 0; pointer-events: none; z-index: 2;
+  background: rgba(255, 10, 60, 0.06);
+  mix-blend-mode: screen;
+  animation: chromaRed 3s ease-in-out infinite;
+}
+.chroma-b {
+  position: absolute; inset: 0; pointer-events: none; z-index: 2;
+  background: rgba(10, 60, 255, 0.06);
+  mix-blend-mode: screen;
+  animation: chromaBlue 3s ease-in-out infinite;
+  animation-delay: -1.5s;
+}
+
+@keyframes chromaRed {
+  0%, 100% { transform: translateX(-2px) scaleX(1.002); opacity: 0.7; }
+  50%       { transform: translateX(-5px) scaleX(1.004); opacity: 1; }
+}
+@keyframes chromaBlue {
+  0%, 100% { transform: translateX(2px) scaleX(1.002); opacity: 0.7; }
+  50%       { transform: translateX(5px) scaleX(1.004); opacity: 1; }
+}
+
+/* ── Rivals overlay animations ────────────────────────────────────────────── */
+
+@keyframes rivalsFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes rivalsPanelIn {
+  from { opacity: 0; transform: translateX(48px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ── Rivals input focus ───────────────────────────────────────────────────── */
+
+.ds-input:focus { outline: none; }
+.ds-input-wrap:focus-within .ds-line {
+  background: #c8952a !important;
+  box-shadow: 0 0 8px rgba(200, 149, 42, 0.3);
+}
+.ds-select:focus { outline: none; }
+.ds-select-wrap:focus-within .ds-line {
+  background: #c8952a !important;
+}
+
+/* allow text selection in rivals panel */
+.rivals-panel, .rivals-panel * {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* thin scrollbar */
+.rivals-scroll::-webkit-scrollbar { width: 3px; }
+.rivals-scroll::-webkit-scrollbar-track { background: transparent; }
+.rivals-scroll::-webkit-scrollbar-thumb { background: rgba(200,149,42,0.25); }
+
+/* reveal button hover */
+.reveal-btn:hover:not(:disabled) {
+  border-color: #c8952a !important;
+  color: #c8952a !important;
+}
+.submit-btn:hover:not(:disabled) {
+  background: rgba(200,149,42,0.08) !important;
+}
+.char-btn:hover {
+  border-color: rgba(255,255,255,0.15) !important;
+  color: #ede8df !important;
+}

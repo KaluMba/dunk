@@ -1,29 +1,68 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 const API = import.meta.env.VITE_RIVALS_API ?? 'http://localhost:8080'
-
-const ROLE = {
-  vanguard:   { bg: '#0d2040', text: '#5090e0', label: 'VG' },
-  duelist:    { bg: '#2a0d0d', text: '#e05050', label: 'DL' },
-  strategist: { bg: '#0d2a14', text: '#50c070', label: 'ST' },
-}
-const RANKS   = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Celestial', 'One Above All']
-const REGIONS = ['NA-East', 'NA-West', 'EU', 'Asia', 'SA', 'OCE']
+const RANKS   = ['Bronze','Silver','Gold','Platinum','Diamond','Celestial','One Above All']
+const REGIONS = ['NA-East','NA-West','EU','Asia','SA','OCE']
 const FREE_REVEALS = 3
+
+const ROLE_COLOR = {
+  vanguard:   '#5b8fe8',
+  duelist:    '#e05858',
+  strategist: '#52c47a',
+}
 
 function timeAgo(iso) {
   const diff = (Date.now() - new Date(iso)) / 1000
-  if (diff < 3600)   return `${Math.floor(diff / 60)}m ago`
-  if (diff < 86400)  return `${Math.floor(diff / 3600)}h ago`
+  if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
   return `${Math.floor(diff / 86400)}d ago`
 }
 
-function StatChip({ label, value, highlight }) {
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function FieldInput({ label, inputRef, value, onChange, placeholder }) {
   return (
-    <span style={{ ...s.chip, ...(highlight ? s.chipHL : {}) }}>
-      <span style={s.chipLabel}>{label}</span>
-      <span style={s.chipValue}>{value}</span>
-    </span>
+    <div style={s.fieldWrap} className="ds-input-wrap">
+      <span style={s.fieldLabel}>{label}</span>
+      <input
+        ref={inputRef}
+        className="ds-input"
+        style={s.fieldInput}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        autoComplete="off"
+        spellCheck={false}
+      />
+      <div style={s.fieldLine} className="ds-line" />
+    </div>
+  )
+}
+
+function FieldSelect({ label, value, onChange, options }) {
+  return (
+    <div style={s.fieldWrap} className="ds-select-wrap">
+      <span style={s.fieldLabel}>{label}</span>
+      <select
+        className="ds-select"
+        style={s.fieldSelect}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+      >
+        <option value="">Any</option>
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+      <div style={s.fieldLine} className="ds-line" />
+    </div>
+  )
+}
+
+function Stat({ label, value }) {
+  return (
+    <div style={s.stat}>
+      <span style={s.statVal}>{value}</span>
+      <span style={s.statLbl}>{label}</span>
+    </div>
   )
 }
 
@@ -31,138 +70,169 @@ function PlayerCard({ result, searchedChars, revealedNames, revealsLeft, onRevea
   const { profile, matchScore } = result
   const revealed = revealedNames[profile.id]
   const [revealing, setRevealing] = useState(false)
+  const [copied, setCopied] = useState(false)
 
-  // Sort mains: matched ones first
   const sortedMains = [...(profile.mainCharacters || [])].sort((a, b) => {
     const am = searchedChars.includes(a), bm = searchedChars.includes(b)
     return am === bm ? 0 : am ? -1 : 1
   })
 
   async function handleReveal() {
-    if (revealsLeft <= 0) return
+    if (revealsLeft <= 0 || revealing) return
     setRevealing(true)
     try {
       const res = await fetch(`${API}/api/reveal/${profile.id}`, { method: 'POST' })
       const data = await res.json()
       onReveal(profile.id, data.username)
-    } finally {
-      setRevealing(false)
-    }
+    } finally { setRevealing(false) }
   }
 
-  return (
-    <div style={s.card}>
-      {/* Header */}
-      <div style={s.cardHead}>
-        <div style={s.cardLeft}>
-          <div style={s.cardIdentity}>
-            {revealed
-              ? <span style={s.cardName}>{revealed}</span>
-              : <span style={s.anonName}>
-                  <span style={s.lockIcon}>🔒</span>
-                  <span style={s.anonBlur}>████████████</span>
-                </span>
-            }
-            <span style={s.cardId}>{profile.id}</span>
-          </div>
-          <div style={s.cardMeta}>
-            {profile.rank && <span style={s.metaTag}>{profile.rank}</span>}
-            {profile.region && <span style={s.metaTag}>{profile.region}</span>}
-            <span style={s.metaTag}>⏱ {timeAgo(profile.lastActive)}</span>
-          </div>
-        </div>
-        <div style={s.matchScore}>
-          <span style={s.matchNum}>{matchScore}</span>
-          <span style={s.matchWord}>match{matchScore !== 1 ? 'es' : ''}</span>
-        </div>
-      </div>
-
-      {/* Per-character stats */}
-      <div style={s.heroRows}>
-        {sortedMains.map(name => {
-          const cs = profile.stats?.[name]
-          const isMatch = searchedChars.includes(name)
-          // Find role from character name
-          return (
-            <div key={name} style={{ ...s.heroRow, ...(isMatch ? s.heroRowMatch : s.heroRowDim) }}>
-              <span style={s.heroName}>{name}</span>
-              {cs ? (
-                <div style={s.heroStats}>
-                  <StatChip label="KDA"  value={cs.kda.toFixed(2)}  highlight={isMatch} />
-                  <StatChip label="WR"   value={`${cs.winRate.toFixed(1)}%`} highlight={isMatch} />
-                  <StatChip label="TIME" value={`${cs.playtimeHours.toFixed(1)}h`} highlight={isMatch} />
-                  <StatChip label="GP"   value={cs.games} />
-                </div>
-              ) : (
-                <span style={s.noStats}>no data</span>
-              )}
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Actions */}
-      <div style={s.cardActions}>
-        {revealed ? (
-          <CopyButton username={revealed} />
-        ) : (
-          <button
-            style={{ ...s.revealBtn, ...(revealsLeft <= 0 ? s.revealBtnDisabled : {}) }}
-            onClick={handleReveal}
-            disabled={revealing || revealsLeft <= 0}
-          >
-            {revealing ? 'Revealing...' : revealsLeft > 0 ? `Reveal username →` : 'No reveals left'}
-          </button>
-        )}
-        {!revealed && revealsLeft <= 0 && (
-          <button style={s.proBtn} onClick={() => alert('Pro tier coming soon — get unlimited reveals and first-dibs invites.')}>
-            ⭐ Go Pro
-          </button>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function CopyButton({ username }) {
-  const [copied, setCopied] = useState(false)
-  async function copy() {
-    await navigator.clipboard.writeText(username)
+  async function copyName() {
+    if (!revealed) return
+    await navigator.clipboard.writeText(revealed)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
+
+  const matchedMains = sortedMains.filter(n => searchedChars.includes(n))
+
   return (
-    <div style={s.revealedActions}>
-      <span style={s.revealedName}>{username}</span>
-      <button style={{ ...s.copyBtn, ...(copied ? s.copyBtnDone : {}) }} onClick={copy}>
-        {copied ? '✓ Copied' : 'Copy username'}
-      </button>
-      <span style={s.copyHint}>Search in Marvel Rivals → Social → Add friend</span>
+    <div style={s.card}>
+      {/* amber left accent on match */}
+      <div style={{ ...s.cardAccent, opacity: matchScore > 1 ? 1 : 0.4 }} />
+
+      <div style={s.cardTop}>
+        <div style={s.cardLeft}>
+          {/* Identity */}
+          <div style={s.identity}>
+            {revealed
+              ? <span style={s.revealedName}>{revealed}</span>
+              : <span style={s.anonRow}>
+                  <span style={s.anonGlyph}>◈</span>
+                  <span style={s.anonHash}>{'▓'.repeat(9)}</span>
+                </span>
+            }
+          </div>
+          <span style={s.cardIdStr}>{profile.id}</span>
+
+          {/* Mains */}
+          <div style={s.mainsRow}>
+            {sortedMains.map(name => {
+              const isMatch = searchedChars.includes(name)
+              return (
+                <span key={name} style={{ ...s.mainTag, ...(isMatch ? s.mainTagMatch : s.mainTagDim) }}>
+                  {name}
+                </span>
+              )
+            })}
+          </div>
+
+          {/* Meta */}
+          <div style={s.cardMetaRow}>
+            {profile.rank   && <span style={s.metaPill}>{profile.rank}</span>}
+            {profile.region && <span style={s.metaPill}>{profile.region}</span>}
+            <span style={s.metaDim}>{timeAgo(profile.lastActive)}</span>
+          </div>
+        </div>
+
+        {/* Match score */}
+        <div style={s.matchBadge}>
+          <span style={s.matchNum}>{matchScore}</span>
+          <span style={s.matchWord}>MATCH{matchScore !== 1 ? 'ES' : ''}</span>
+        </div>
+      </div>
+
+      {/* Stats for matched characters */}
+      {matchedMains.length > 0 && (
+        <div style={s.statsSection}>
+          {matchedMains.map(name => {
+            const cs = profile.stats?.[name]
+            if (!cs) return null
+            return (
+              <div key={name} style={s.statRow}>
+                <span style={s.statCharName}>{name}</span>
+                <div style={s.statBlocks}>
+                  <Stat label="KDA"      value={cs.kda.toFixed(2)} />
+                  <Stat label="WIN RATE" value={`${cs.winRate.toFixed(1)}%`} />
+                  <Stat label="PLAYED"   value={`${cs.playtimeHours.toFixed(1)}h`} />
+                  <Stat label="GAMES"    value={cs.games} />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Action */}
+      <div style={s.cardActions}>
+        {revealed ? (
+          <>
+            <button
+              className="reveal-btn"
+              style={{ ...s.actionBtn, borderColor: 'rgba(82,196,122,0.4)', color: '#52c47a' }}
+              onClick={copyName}
+            >
+              {copied ? '✓  COPIED' : 'COPY USERNAME'}
+            </button>
+            <span style={s.copyHint}>Social → Add Friend in Marvel Rivals</span>
+          </>
+        ) : (
+          <>
+            <button
+              className="reveal-btn"
+              style={{ ...s.actionBtn, ...(revealsLeft <= 0 ? s.actionBtnOut : {}) }}
+              onClick={handleReveal}
+              disabled={revealing || revealsLeft <= 0}
+            >
+              {revealing ? 'SCANNING...' : revealsLeft > 0 ? '◈  REVEAL IDENTITY' : 'NO REVEALS LEFT'}
+            </button>
+            {revealsLeft <= 0 && (
+              <button
+                className="reveal-btn"
+                style={{ ...s.actionBtn, borderColor: 'rgba(200,149,42,0.4)', color: '#c8952a' }}
+                onClick={() => alert('Pro tier coming soon — unlimited reveals.')}
+              >
+                ✦  GO PRO
+              </button>
+            )}
+          </>
+        )}
+      </div>
     </div>
   )
 }
 
-export default function RivalsApp() {
-  const [characters, setCharacters]  = useState([])
-  const [step, setStep]              = useState('form')  // form | results
-  const [username, setUsername]      = useState('')
-  const [rank, setRank]              = useState('')
-  const [region, setRegion]          = useState('')
-  const [selected, setSelected]      = useState([])
-  const [roleFilter, setRoleFilter]  = useState('all')
-  const [loading, setLoading]        = useState(false)
-  const [error, setError]            = useState('')
-  const [myProfile, setMyProfile]    = useState(null)
-  const [results, setResults]        = useState([])
+// ── Main overlay ──────────────────────────────────────────────────────────────
+
+export default function RivalsOverlay({ onClose }) {
+  const [characters, setCharacters]       = useState([])
+  const [step, setStep]                   = useState('form')
+  const [username, setUsername]           = useState('')
+  const [rank, setRank]                   = useState('')
+  const [region, setRegion]               = useState('')
+  const [selected, setSelected]           = useState([])
+  const [roleFilter, setRoleFilter]       = useState('all')
+  const [loading, setLoading]             = useState(false)
+  const [error, setError]                 = useState('')
+  const [myProfile, setMyProfile]         = useState(null)
+  const [results, setResults]             = useState([])
   const [revealedNames, setRevealedNames] = useState({})
-  const [revealsLeft, setRevealsLeft] = useState(FREE_REVEALS)
+  const [revealsLeft, setRevealsLeft]     = useState(FREE_REVEALS)
+  const inputRef = useRef()
 
   useEffect(() => {
     fetch(`${API}/api/characters`)
       .then(r => r.json())
       .then(setCharacters)
-      .catch(() => setError('Cannot reach backend — start the Go server: cd backend && go run .'))
+      .catch(() => setError('Cannot reach backend'))
+    setTimeout(() => inputRef.current?.focus(), 120)
   }, [])
+
+  useEffect(() => {
+    const handler = e => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
 
   function toggleChar(name) {
     setSelected(prev => prev.includes(name) ? prev.filter(c => c !== name) : [...prev, name])
@@ -170,13 +240,11 @@ export default function RivalsApp() {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!username.trim()) return setError('Enter your Marvel Rivals username')
-    if (!selected.length) return setError('Select at least one character to search for')
+    if (!username.trim()) return setError('Username required')
+    if (!selected.length) return setError('Select at least one character')
     setError('')
     setLoading(true)
-
     try {
-      // Register self (fetches real stats from API)
       const regRes = await fetch(`${API}/api/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -186,11 +254,7 @@ export default function RivalsApp() {
       if (!regRes.ok) throw new Error(regData.error || 'Registration failed')
       setMyProfile(regData)
 
-      // Search for teammates
-      const params = new URLSearchParams({
-        characters: selected.join(','),
-        exclude: regData.playerId,
-      })
+      const params = new URLSearchParams({ characters: selected.join(','), exclude: regData.playerId })
       const searchRes = await fetch(`${API}/api/search?${params}`)
       const searchData = await searchRes.json()
       setResults(searchData ?? [])
@@ -207,278 +271,432 @@ export default function RivalsApp() {
     setRevealsLeft(prev => prev - 1)
   }
 
-  const visible = roleFilter === 'all' ? characters : characters.filter(c => c.role === roleFilter)
+  const visible = roleFilter === 'all'
+    ? characters
+    : characters.filter(c => c.role === roleFilter)
 
   return (
-    <div style={s.page}>
-      <header style={s.header}>
-        <a href="#" style={s.back}>← back</a>
-        <div style={s.logo}>
-          <span style={s.logoDunk}>dunk</span>
-          <span style={s.logoSep}> // </span>
-          <span style={s.logoRivals}>RIVALS</span>
+    <div style={s.backdrop} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div style={s.panel} className="rivals-panel">
+
+        {/* ── Header ─────────────────────────────────────────────────────── */}
+        <div style={s.header}>
+          <div style={s.headerLeft}>
+            <span style={s.amberDot} />
+            <span style={s.headerTitle}>RIVALS</span>
+            <span style={s.headerSub}>TEAMMATE REGISTRY</span>
+          </div>
+          <button style={s.escBtn} onClick={onClose}>ESC</button>
         </div>
-        <div style={{ width: 60 }} />
-      </header>
+        <div style={s.headerRule} />
 
-      <main style={s.main}>
+        {/* ── Scrollable body ────────────────────────────────────────────── */}
+        <div style={s.body} className="rivals-scroll">
 
-        {step === 'form' && (
-          <form onSubmit={handleSubmit} style={s.form}>
-            <div style={s.section}>
-              <h2 style={s.sectionTitle}>Your account</h2>
-              <div style={s.fieldRow}>
-                <div style={s.field}>
-                  <label style={s.label}>Marvel Rivals username</label>
-                  <input
-                    style={s.input}
-                    value={username}
-                    onChange={e => setUsername(e.target.value)}
-                    placeholder="e.g. IronCore99"
-                    autoComplete="off"
-                  />
-                </div>
-                <div style={s.field}>
-                  <label style={s.label}>Rank <span style={s.opt}>(optional)</span></label>
-                  <select style={s.select} value={rank} onChange={e => setRank(e.target.value)}>
-                    <option value="">Any</option>
-                    {RANKS.map(r => <option key={r}>{r}</option>)}
-                  </select>
-                </div>
-                <div style={s.field}>
-                  <label style={s.label}>Region <span style={s.opt}>(optional)</span></label>
-                  <select style={s.select} value={region} onChange={e => setRegion(e.target.value)}>
-                    <option value="">Any</option>
-                    {REGIONS.map(r => <option key={r}>{r}</option>)}
-                  </select>
-                </div>
-              </div>
-              <p style={s.hint}>
-                We'll fetch your stats from the Marvel Rivals API and add you to the registry so others can find you.
-              </p>
-            </div>
+          {step === 'form' && (
+            <form onSubmit={handleSubmit} style={s.form}>
 
-            <div style={s.section}>
-              <div style={s.pickerTop}>
-                <div>
-                  <h2 style={s.sectionTitle}>I want to team up with someone who plays…</h2>
-                  <p style={s.sublabel}>Select in priority order</p>
+              {/* IDENTIFY */}
+              <section style={s.section}>
+                <span style={s.sectionLbl}>IDENTIFY</span>
+                <FieldInput
+                  label="MARVEL RIVALS USERNAME"
+                  inputRef={inputRef}
+                  value={username}
+                  onChange={setUsername}
+                  placeholder="e.g. IronCore99"
+                />
+                <div style={s.selectPair}>
+                  <FieldSelect label="RANK"   value={rank}   onChange={setRank}   options={RANKS}   />
+                  <FieldSelect label="REGION" value={region} onChange={setRegion} options={REGIONS} />
                 </div>
-                <div style={s.roleFilters}>
+                <p style={s.note}>
+                  Stats are fetched live from the Marvel Rivals API and added to the anonymous registry.
+                </p>
+              </section>
+
+              <div style={s.rule} />
+
+              {/* FIND */}
+              <section style={s.section}>
+                <span style={s.sectionLbl}>FIND PLAYERS WHO MAIN</span>
+
+                <div style={s.rolePills}>
                   {['all','vanguard','duelist','strategist'].map(r => (
                     <button key={r} type="button"
-                      style={{ ...s.roleBtn, ...(roleFilter === r ? s.roleBtnOn : {}) }}
+                      style={{ ...s.rolePill, ...(roleFilter === r ? s.rolePillOn : {}) }}
                       onClick={() => setRoleFilter(r)}
-                    >{r}</button>
-                  ))}
-                </div>
-              </div>
-
-              {selected.length > 0 && (
-                <div style={s.badges}>
-                  {selected.map((name, i) => (
-                    <span key={name} style={s.badge}>
-                      <span style={s.badgeNum}>{i+1}</span>
-                      {name}
-                      <button type="button" style={s.badgeX} onClick={() => toggleChar(name)}>×</button>
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              <div style={s.grid}>
-                {visible.map(c => {
-                  const idx = selected.indexOf(c.name)
-                  const on = idx !== -1
-                  const rc = ROLE[c.role] ?? ROLE.duelist
-                  return (
-                    <button key={c.id} type="button"
-                      style={{ ...s.charCard, ...(on ? { borderColor: rc.text, background: rc.bg } : {}) }}
-                      onClick={() => toggleChar(c.name)}
                     >
-                      {on && <span style={{ ...s.charIdx, color: rc.text }}>{idx+1}</span>}
-                      <span style={s.charName}>{c.name}</span>
-                      <span style={{ ...s.roleTag, background: rc.bg, color: rc.text }}>{rc.label}</span>
+                      {r === 'all' ? 'ALL' : r.slice(0,2).toUpperCase()}
                     </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {error && <p style={s.error}>{error}</p>}
-
-            <button type="submit" style={s.submitBtn} disabled={loading}>
-              {loading ? 'Fetching your stats…' : 'Find teammates →'}
-            </button>
-          </form>
-        )}
-
-        {step === 'results' && (
-          <div style={s.results}>
-            {/* Your profile card */}
-            {myProfile && (
-              <div style={s.myCard}>
-                <div style={s.myCardHead}>
-                  <span style={s.myCardTitle}>You're registered</span>
-                  <span style={s.myId}>{myProfile.playerId}</span>
+                  ))}
                 </div>
-                {myProfile.mainCharacters?.length > 0 ? (
-                  <div style={s.myMains}>
-                    <span style={s.myMainsLabel}>Detected mains:</span>
-                    {myProfile.mainCharacters.map(name => {
-                      const cs = myProfile.stats?.[name]
-                      return (
-                        <span key={name} style={s.myMain}>
-                          {name}
-                          {cs && <span style={s.myMainStats}> · {cs.kda.toFixed(2)} KDA · {cs.winRate.toFixed(1)}% WR · {cs.playtimeHours.toFixed(1)}h</span>}
-                        </span>
-                      )
-                    })}
+
+                {selected.length > 0 && (
+                  <div style={s.selectedRow}>
+                    {selected.map((name, i) => (
+                      <span key={name} style={s.selChip}>
+                        <span style={s.selIdx}>{i + 1}</span>
+                        {name}
+                        <button type="button" style={s.selX} onClick={() => toggleChar(name)}>×</button>
+                      </span>
+                    ))}
                   </div>
-                ) : (
-                  <p style={s.noMains}>No match history found — play some games then try again.</p>
                 )}
-              </div>
-            )}
 
-            {/* Results header */}
-            <div style={s.resultsHead}>
-              <button style={s.backBtn} onClick={() => setStep('form')}>← New search</button>
-              <div style={s.resultsRight}>
-                {revealsLeft > 0 && (
-                  <span style={s.revealsLeft}>{revealsLeft} free reveal{revealsLeft !== 1 ? 's' : ''} left</span>
-                )}
-                <span style={s.resultsCount}>
-                  {results.length === 0
-                    ? 'No players found yet'
-                    : `${results.length} player${results.length !== 1 ? 's' : ''} found`}
-                </span>
-              </div>
-            </div>
+                <div style={s.charGrid}>
+                  {visible.map(c => {
+                    const on  = selected.includes(c.name)
+                    const col = ROLE_COLOR[c.role] ?? '#888'
+                    return (
+                      <button key={c.id} type="button"
+                        className="char-btn"
+                        style={{ ...s.charBtn, ...(on ? { borderColor: col, color: col } : {}) }}
+                        onClick={() => toggleChar(c.name)}
+                      >
+                        {on && <span style={{ ...s.charDot, background: col }} />}
+                        <span style={s.charName}>{c.name}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </section>
 
-            {/* Player cards */}
-            <div style={s.cards}>
-              {results.map(result => (
-                <PlayerCard
-                  key={result.profile.id}
-                  result={result}
-                  searchedChars={selected}
-                  revealedNames={revealedNames}
-                  revealsLeft={revealsLeft}
-                  onReveal={handleReveal}
-                />
-              ))}
-              {results.length === 0 && (
-                <div style={s.emptyState}>
-                  <p style={s.emptyTitle}>No players found yet</p>
-                  <p style={s.emptyHint}>You've been added to the registry. Share this page and you'll start seeing matches when others register.</p>
+              {error && <p style={s.error}>{error}</p>}
+
+              <button
+                type="submit"
+                className="submit-btn"
+                style={s.submitBtn}
+                disabled={loading}
+              >
+                {loading
+                  ? '— SCANNING REGISTRY...'
+                  : 'SEARCH REGISTRY ─────────────────────────────→'}
+              </button>
+
+            </form>
+          )}
+
+          {step === 'results' && (
+            <div style={s.results}>
+
+              {/* Your registration summary */}
+              {myProfile && (
+                <div style={s.myCard}>
+                  <div style={s.myCardTop}>
+                    <span style={s.myCardLbl}>● REGISTERED</span>
+                    <span style={s.myCardId}>{myProfile.playerId}</span>
+                  </div>
+                  {myProfile.mainCharacters?.length > 0 && (
+                    <div style={s.myMains}>
+                      {myProfile.mainCharacters.map(name => {
+                        const cs = myProfile.stats?.[name]
+                        return (
+                          <span key={name} style={s.myMain}>
+                            {name}
+                            {cs && (
+                              <span style={s.myMainStat}>
+                                {cs.kda.toFixed(2)} KDA · {cs.winRate.toFixed(1)}% WR
+                              </span>
+                            )}
+                          </span>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
+
+              {/* Results header */}
+              <div style={s.resultsTop}>
+                <button style={s.backBtn} onClick={() => setStep('form')}>← NEW SEARCH</button>
+                <div style={s.resultsRight}>
+                  {revealsLeft > 0 && (
+                    <span style={s.revealsLeft}>
+                      {revealsLeft} REVEAL{revealsLeft !== 1 ? 'S' : ''} LEFT
+                    </span>
+                  )}
+                  <span style={s.resultCount}>
+                    {results.length} PLAYER{results.length !== 1 ? 'S' : ''} FOUND
+                  </span>
+                </div>
+              </div>
+
+              <div style={s.rule} />
+
+              {results.length === 0 ? (
+                <div style={s.empty}>
+                  <span style={s.emptyTitle}>NO MATCHES YET</span>
+                  <span style={s.emptyHint}>
+                    You've been added to the registry. As more players register,
+                    matches will appear here.
+                  </span>
+                </div>
+              ) : (
+                <div style={s.cards}>
+                  {results.map(r => (
+                    <PlayerCard
+                      key={r.profile.id}
+                      result={r}
+                      searchedChars={selected}
+                      revealedNames={revealedNames}
+                      revealsLeft={revealsLeft}
+                      onReveal={handleReveal}
+                    />
+                  ))}
+                </div>
+              )}
+
             </div>
-          </div>
-        )}
-      </main>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
 
+// ── Design tokens ─────────────────────────────────────────────────────────────
+
+const A  = '#c8952a'          // amber
+const AD = 'rgba(200,149,42,0.14)'
+const T  = '#ede8df'          // warm white
+const TD = '#6b6458'          // dim
+const TDD= '#302c26'          // very dim
+const BDR= 'rgba(255,255,255,0.06)'
+
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const s = {
-  page:        { minHeight: '100dvh', background: '#06060f', color: '#d8d8e8', fontFamily: "'Syne', system-ui, sans-serif", display: 'flex', flexDirection: 'column' },
-  header:      { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 28px', borderBottom: '1px solid #12122a' },
-  back:        { color: '#444', textDecoration: 'none', fontSize: 13, width: 60 },
-  logo:        { display: 'flex', alignItems: 'baseline', gap: 4 },
-  logoDunk:    { fontSize: 11, color: '#333', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase' },
-  logoSep:     { fontSize: 11, color: '#222' },
-  logoRivals:  { fontSize: 17, fontWeight: 800, letterSpacing: '0.15em', color: '#e8192c' },
-  main:        { flex: 1, padding: '28px 28px 48px', maxWidth: 820, margin: '0 auto', width: '100%', boxSizing: 'border-box' },
-  form:        { display: 'flex', flexDirection: 'column', gap: 32 },
-  section:     { display: 'flex', flexDirection: 'column', gap: 14 },
-  sectionTitle:{ fontSize: 13, fontWeight: 800, letterSpacing: '0.06em', color: '#888', textTransform: 'uppercase', margin: 0 },
-  fieldRow:    { display: 'flex', gap: 12, flexWrap: 'wrap' },
-  field:       { display: 'flex', flexDirection: 'column', gap: 5, flex: 1, minWidth: 160 },
-  label:       { fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: '#666', textTransform: 'uppercase' },
-  opt:         { fontWeight: 400, color: '#444', textTransform: 'none', letterSpacing: 0 },
-  input:       { background: '#0d0d1c', border: '1px solid #1e1e38', borderRadius: 6, color: '#d8d8e8', fontSize: 15, padding: '10px 13px', outline: 'none', fontFamily: 'inherit' },
-  select:      { background: '#0d0d1c', border: '1px solid #1e1e38', borderRadius: 6, color: '#d8d8e8', fontSize: 14, padding: '10px 13px', outline: 'none', fontFamily: 'inherit', width: '100%' },
-  hint:        { fontSize: 11, color: '#444', margin: 0 },
-  pickerTop:   { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10 },
-  sublabel:    { fontSize: 11, color: '#555', margin: '3px 0 0' },
-  roleFilters: { display: 'flex', gap: 5 },
-  roleBtn:     { background: 'none', border: '1px solid #1e1e38', borderRadius: 4, color: '#555', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', padding: '5px 10px', cursor: 'pointer', textTransform: 'uppercase', fontFamily: 'inherit' },
-  roleBtnOn:   { borderColor: '#e8192c', color: '#e8192c' },
-  badges:      { display: 'flex', flexWrap: 'wrap', gap: 6 },
-  badge:       { display: 'inline-flex', alignItems: 'center', gap: 5, background: '#12122a', border: '1px solid #2a2a50', borderRadius: 4, padding: '4px 9px', fontSize: 12, fontWeight: 700, color: '#a0a0cc' },
-  badgeNum:    { color: '#555', fontSize: 10 },
-  badgeX:      { background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 14, lineHeight: 1, padding: 0, marginLeft: 2 },
-  grid:        { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 7 },
-  charCard:    { background: '#0d0d1c', border: '1px solid #1a1a30', borderRadius: 6, padding: '9px 11px', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 5, position: 'relative', fontFamily: 'inherit', transition: 'border-color 0.12s, background 0.12s' },
-  charIdx:     { position: 'absolute', top: 7, right: 9, fontSize: 10, fontWeight: 800 },
-  charName:    { fontSize: 12, fontWeight: 700, color: '#b0b0cc', lineHeight: 1.25 },
-  roleTag:     { fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', padding: '2px 5px', borderRadius: 3 },
-  error:       { color: '#e8192c', fontSize: 13, margin: 0 },
-  submitBtn:   { background: '#e8192c', color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 800, padding: '13px 26px', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.05em', alignSelf: 'flex-start' },
+  // Backdrop — darkens the left side where 3D shows through
+  backdrop: {
+    position: 'fixed', inset: 0, zIndex: 100,
+    background: 'rgba(0,0,0,0.25)',
+    display: 'flex', justifyContent: 'flex-end',
+    animation: 'rivalsFadeIn 0.25s ease',
+  },
+
+  // Main panel — slides in from right
+  panel: {
+    width: '100%', maxWidth: 620, height: '100dvh',
+    background: 'rgba(6,5,14,0.96)',
+    backdropFilter: 'blur(32px) saturate(1.8)',
+    display: 'flex', flexDirection: 'column',
+    fontFamily: "'Syne', system-ui, sans-serif",
+    color: T,
+    borderLeft: `1px solid rgba(200,149,42,0.12)`,
+    animation: 'rivalsPanelIn 0.35s cubic-bezier(0.16,1,0.3,1)',
+  },
+
+  // Header
+  header: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '22px 28px 18px', flexShrink: 0,
+  },
+  headerLeft: { display: 'flex', alignItems: 'center', gap: 12 },
+  amberDot: {
+    width: 6, height: 6, borderRadius: '50%',
+    background: A, boxShadow: `0 0 10px ${A}`,
+    flexShrink: 0,
+  },
+  headerTitle: {
+    fontSize: 12, fontWeight: 800, letterSpacing: '0.22em', color: A,
+  },
+  headerSub: {
+    fontSize: 9, fontWeight: 700, letterSpacing: '0.14em',
+    color: TD, textTransform: 'uppercase',
+  },
+  escBtn: {
+    background: 'none', border: `1px solid ${BDR}`,
+    color: TD, fontSize: 9, fontWeight: 800, letterSpacing: '0.14em',
+    padding: '5px 11px', cursor: 'pointer', fontFamily: 'inherit',
+    flexShrink: 0,
+  },
+  headerRule: {
+    height: 1, flexShrink: 0,
+    background: `linear-gradient(90deg, ${A}55 0%, ${A}18 40%, transparent 80%)`,
+  },
+
+  // Body
+  body: {
+    flex: 1, overflowY: 'auto', padding: '28px 28px 56px',
+    display: 'flex', flexDirection: 'column',
+  },
+
+  // Form
+  form: { display: 'flex', flexDirection: 'column', gap: 28 },
+  section: { display: 'flex', flexDirection: 'column', gap: 18 },
+  sectionLbl: {
+    fontSize: 9, fontWeight: 800, letterSpacing: '0.22em',
+    color: TD, textTransform: 'uppercase',
+  },
+
+  // Inputs
+  fieldWrap: { display: 'flex', flexDirection: 'column', gap: 7 },
+  fieldLabel: {
+    fontSize: 8, fontWeight: 800, letterSpacing: '0.2em',
+    color: TDD, textTransform: 'uppercase',
+  },
+  fieldInput: {
+    background: 'transparent', border: 'none', outline: 'none',
+    color: T, fontSize: 20, fontWeight: 600, fontFamily: 'inherit',
+    padding: '4px 0', width: '100%', caretColor: A,
+  },
+  fieldLine: { height: 1, background: BDR, transition: 'background 0.2s, box-shadow 0.2s' },
+  selectPair: { display: 'flex', gap: 24 },
+  fieldSelect: {
+    background: 'transparent', border: 'none', outline: 'none',
+    color: T, fontSize: 15, fontWeight: 600, fontFamily: 'inherit',
+    padding: '4px 0', width: '100%', cursor: 'pointer', appearance: 'none',
+  },
+  note: { fontSize: 10, color: TDD, lineHeight: 1.7, margin: 0 },
+  rule: { height: 1, background: BDR, flexShrink: 0 },
+
+  // Role pills
+  rolePills: { display: 'flex', gap: 5 },
+  rolePill: {
+    background: 'none', border: `1px solid ${BDR}`,
+    color: TD, fontSize: 8, fontWeight: 800, letterSpacing: '0.16em',
+    padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit',
+    transition: 'border-color 0.12s, color 0.12s',
+  },
+  rolePillOn: { borderColor: A, color: A },
+
+  // Selected chips
+  selectedRow: { display: 'flex', flexWrap: 'wrap', gap: 5 },
+  selChip: {
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+    border: `1px solid ${A}`, color: A,
+    fontSize: 10, fontWeight: 700, padding: '4px 9px',
+  },
+  selIdx: { fontSize: 8, color: `${A}88`, marginRight: 2 },
+  selX: {
+    background: 'none', border: 'none', cursor: 'pointer',
+    color: `${A}88`, fontSize: 14, padding: 0, lineHeight: 1,
+    marginLeft: 2, fontFamily: 'inherit',
+  },
+
+  // Character grid
+  charGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+    gap: 3,
+  },
+  charBtn: {
+    background: 'transparent', border: `1px solid ${BDR}`,
+    color: TD, fontSize: 11, fontWeight: 700,
+    padding: '7px 10px', cursor: 'pointer', fontFamily: 'inherit',
+    textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6,
+    transition: 'border-color 0.1s, color 0.1s',
+  },
+  charDot: { width: 5, height: 5, borderRadius: '50%', flexShrink: 0 },
+  charName: { fontSize: 11 },
+
+  // Error + submit
+  error: { color: '#e84848', fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', margin: 0 },
+  submitBtn: {
+    background: 'none', border: `1px solid ${A}`,
+    color: A, fontSize: 9, fontWeight: 800, letterSpacing: '0.1em',
+    padding: '15px 20px', cursor: 'pointer', fontFamily: 'inherit',
+    textAlign: 'left', transition: 'background 0.15s', marginTop: 8,
+  },
 
   // Results
-  results:     { display: 'flex', flexDirection: 'column', gap: 16 },
-  myCard:      { background: '#0a0a1a', border: '1px solid #1e1e3a', borderRadius: 8, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 10 },
-  myCardHead:  { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  myCardTitle: { fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', color: '#50c070', textTransform: 'uppercase' },
-  myId:        { fontSize: 11, color: '#444', fontFamily: 'monospace' },
-  myMains:     { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
-  myMainsLabel:{ fontSize: 11, color: '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' },
-  myMain:      { fontSize: 13, fontWeight: 700, color: '#a0c0ff' },
-  myMainStats: { fontSize: 11, color: '#555', fontWeight: 400 },
-  noMains:     { fontSize: 12, color: '#555', margin: 0 },
+  results: { display: 'flex', flexDirection: 'column', gap: 16 },
 
-  resultsHead: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  backBtn:     { background: 'none', border: '1px solid #1e1e38', borderRadius: 4, color: '#666', fontSize: 12, padding: '7px 13px', cursor: 'pointer', fontFamily: 'inherit' },
-  resultsRight:{ display: 'flex', alignItems: 'center', gap: 14 },
-  revealsLeft: { fontSize: 11, color: '#e8a020', fontWeight: 700 },
-  resultsCount:{ fontSize: 12, color: '#555' },
-  cards:       { display: 'flex', flexDirection: 'column', gap: 10 },
+  myCard: {
+    borderLeft: `2px solid ${A}`, border: `1px solid ${AD}`,
+    padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8,
+  },
+  myCardTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  myCardLbl: { fontSize: 8, fontWeight: 800, letterSpacing: '0.2em', color: A },
+  myCardId:  { fontSize: 9, color: TD, fontFamily: 'monospace', letterSpacing: '0.05em' },
+  myMains: { display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' },
+  myMain: { fontSize: 12, fontWeight: 700, color: T, display: 'flex', gap: 8, alignItems: 'center' },
+  myMainStat: { fontSize: 10, color: TD },
 
-  card:        { background: '#0a0a18', border: '1px solid #181830', borderRadius: 8, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12 },
-  cardHead:    { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' },
-  cardLeft:    { display: 'flex', flexDirection: 'column', gap: 4 },
-  cardIdentity:{ display: 'flex', alignItems: 'center', gap: 10 },
-  cardName:    { fontSize: 17, fontWeight: 800, color: '#e8e8f8' },
-  anonName:    { display: 'flex', alignItems: 'center', gap: 6 },
-  lockIcon:    { fontSize: 13 },
-  anonBlur:    { fontSize: 15, fontWeight: 800, color: '#2a2a4a', letterSpacing: '0.05em', userSelect: 'none' },
-  cardId:      { fontSize: 10, color: '#333', fontFamily: 'monospace' },
-  cardMeta:    { display: 'flex', gap: 6, flexWrap: 'wrap' },
-  metaTag:     { fontSize: 10, fontWeight: 700, color: '#555', background: '#0f0f20', padding: '2px 7px', borderRadius: 3 },
-  matchScore:  { display: 'flex', flexDirection: 'column', alignItems: 'center', background: '#1a1a08', border: '1px solid #2a2a10', borderRadius: 6, padding: '6px 12px', minWidth: 48 },
-  matchNum:    { fontSize: 20, fontWeight: 800, color: '#c8c030', lineHeight: 1 },
-  matchWord:   { fontSize: 9, color: '#666', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' },
+  resultsTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  backBtn: {
+    background: 'none', border: `1px solid ${BDR}`,
+    color: TD, fontSize: 8, fontWeight: 800, letterSpacing: '0.14em',
+    padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit',
+  },
+  resultsRight: { display: 'flex', alignItems: 'center', gap: 16 },
+  revealsLeft:  { fontSize: 8, fontWeight: 800, letterSpacing: '0.14em', color: A },
+  resultCount:  { fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', color: TD },
 
-  heroRows:    { display: 'flex', flexDirection: 'column', gap: 6 },
-  heroRow:     { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
-  heroRowMatch:{ opacity: 1 },
-  heroRowDim:  { opacity: 0.35 },
-  heroName:    { fontSize: 12, fontWeight: 800, color: '#9090b8', minWidth: 130 },
-  heroStats:   { display: 'flex', gap: 5, flexWrap: 'wrap' },
-  noStats:     { fontSize: 11, color: '#333' },
+  // Cards
+  cards: { display: 'flex', flexDirection: 'column', gap: 6 },
+  card: {
+    border: `1px solid ${BDR}`,
+    padding: '14px 16px 14px 20px',
+    display: 'flex', flexDirection: 'column', gap: 10,
+    position: 'relative',
+  },
+  cardAccent: {
+    position: 'absolute', left: 0, top: 0, bottom: 0,
+    width: 2, background: A,
+  },
+  cardTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
+  cardLeft: { display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 },
 
-  chip:        { display: 'inline-flex', gap: 4, alignItems: 'center', background: '#0f0f20', border: '1px solid #1e1e38', borderRadius: 4, padding: '3px 7px', fontSize: 11 },
-  chipHL:      { background: '#15152a', borderColor: '#2a2a50' },
-  chipLabel:   { color: '#555', fontWeight: 700, fontSize: 9, letterSpacing: '0.06em', textTransform: 'uppercase' },
-  chipValue:   { color: '#a0a0cc', fontWeight: 700 },
+  identity: {},
+  revealedName: { fontSize: 16, fontWeight: 800, color: T },
+  anonRow: { display: 'flex', alignItems: 'center', gap: 6 },
+  anonGlyph: { color: TDD, fontSize: 11 },
+  anonHash: { color: TDD, fontSize: 14, fontWeight: 800, letterSpacing: '0.05em', userSelect: 'none' },
+  cardIdStr: { fontSize: 8, color: TDD, fontFamily: 'monospace', letterSpacing: '0.06em' },
 
-  cardActions:    { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
-  revealBtn:      { background: 'none', border: '1px solid #e8192c', borderRadius: 5, color: '#e8192c', fontSize: 12, fontWeight: 700, padding: '8px 16px', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.04em' },
-  revealBtnDisabled: { borderColor: '#2a2a40', color: '#444', cursor: 'not-allowed' },
-  proBtn:         { background: 'none', border: '1px solid #c8a020', borderRadius: 5, color: '#c8a020', fontSize: 11, fontWeight: 700, padding: '8px 14px', cursor: 'pointer', fontFamily: 'inherit' },
+  mainsRow: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
+  mainTag:      { fontSize: 10, fontWeight: 700, letterSpacing: '0.04em' },
+  mainTagMatch: { color: T },
+  mainTagDim:   { color: TDD },
 
-  revealedActions:{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
-  revealedName:   { fontSize: 15, fontWeight: 800, color: '#e8e8f8' },
-  copyBtn:        { background: 'none', border: '1px solid #2a2a50', borderRadius: 4, color: '#8080a8', fontSize: 11, fontWeight: 700, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' },
-  copyBtnDone:    { borderColor: '#50c070', color: '#50c070' },
-  copyHint:       { fontSize: 10, color: '#444' },
+  cardMetaRow: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' },
+  metaPill: {
+    fontSize: 8, fontWeight: 700, letterSpacing: '0.1em',
+    color: TD, border: `1px solid ${BDR}`, padding: '2px 7px',
+  },
+  metaDim: { fontSize: 8, color: TDD, letterSpacing: '0.04em' },
 
-  emptyState:  { background: '#0a0a18', border: '1px solid #181830', borderRadius: 8, padding: '32px', textAlign: 'center' },
-  emptyTitle:  { fontSize: 15, fontWeight: 800, color: '#555', margin: '0 0 8px' },
-  emptyHint:   { fontSize: 12, color: '#444', margin: 0, lineHeight: 1.6 },
+  matchBadge: {
+    display: 'flex', flexDirection: 'column', alignItems: 'flex-end',
+    flexShrink: 0,
+  },
+  matchNum:  { fontSize: 22, fontWeight: 800, color: A, lineHeight: 1 },
+  matchWord: { fontSize: 6, fontWeight: 800, letterSpacing: '0.16em', color: TD },
+
+  // Stats
+  statsSection: {
+    display: 'flex', flexDirection: 'column', gap: 8,
+    paddingTop: 4, borderTop: `1px solid ${BDR}`,
+  },
+  statRow: { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
+  statCharName: {
+    fontSize: 8, fontWeight: 800, letterSpacing: '0.12em',
+    color: TD, minWidth: 84, textTransform: 'uppercase',
+  },
+  statBlocks: { display: 'flex', gap: 18 },
+  stat: { display: 'flex', flexDirection: 'column', gap: 1 },
+  statVal: { fontSize: 14, fontWeight: 800, color: T, lineHeight: 1 },
+  statLbl: { fontSize: 6, fontWeight: 700, letterSpacing: '0.14em', color: TDD, textTransform: 'uppercase' },
+
+  // Actions
+  cardActions: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
+  actionBtn: {
+    background: 'none', border: `1px solid ${BDR}`,
+    color: TD, fontSize: 8, fontWeight: 800, letterSpacing: '0.16em',
+    padding: '8px 15px', cursor: 'pointer', fontFamily: 'inherit',
+    transition: 'border-color 0.15s, color 0.15s',
+  },
+  actionBtnOut: { color: TDD, cursor: 'not-allowed' },
+  copyHint: { fontSize: 8, color: TDD, letterSpacing: '0.04em' },
+
+  // Empty state
+  empty: {
+    display: 'flex', flexDirection: 'column', gap: 10,
+    padding: '40px 0',
+  },
+  emptyTitle: { fontSize: 11, fontWeight: 800, letterSpacing: '0.16em', color: TD },
+  emptyHint:  { fontSize: 11, color: TDD, lineHeight: 1.8 },
 }
