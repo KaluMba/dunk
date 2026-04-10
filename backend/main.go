@@ -198,7 +198,7 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 
 	p := &RegisteredPlayer{
 		ID:         NewPlayerID(),
-		Username:   req.Username,
+		Username:   profile.Name,
 		UID:        profile.UID,
 		Stats:      stats,
 		MainChars:  mains,
