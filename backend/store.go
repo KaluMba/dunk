@@ -1,42 +1,46 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"sort"
 	"sync"
+	"time"
 )
 
-// Store is a thread-safe in-memory registry of players.
-// Replace with a real database when ready.
+// Store is a thread-safe in-memory registry.
+// Replace the map with a real database (Postgres, SQLite, etc.) when ready.
 type Store struct {
 	mu      sync.RWMutex
-	players map[string]*Player
+	players map[string]*RegisteredPlayer // keyed by player ID
 }
 
 func NewStore() *Store {
-	s := &Store{players: make(map[string]*Player)}
-	s.seed()
-	return s
+	return &Store{players: make(map[string]*RegisteredPlayer)}
 }
 
-func (s *Store) Register(p *Player) {
+func (s *Store) Register(p *RegisteredPlayer) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.players[p.Username] = p
+	s.players[p.ID] = p
 }
 
-// Search returns all players who play at least one of the target characters,
-// sorted by how many characters match (best match first).
-func (s *Store) Search(targets []string, exclude string) []SearchResult {
+// Search returns public profiles of players who play at least one target
+// character, sorted by match score (descending). Self is excluded by ID.
+func (s *Store) Search(targets []string, excludeID string) []SearchResult {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	var results []SearchResult
 	for _, p := range s.players {
-		if p.Username == exclude {
+		if p.ID == excludeID {
 			continue
 		}
 		if score := p.matchScore(targets); score > 0 {
-			results = append(results, SearchResult{Player: p, MatchScore: score})
+			results = append(results, SearchResult{
+				Profile:    p.public(),
+				MatchScore: score,
+			})
 		}
 	}
 
@@ -46,26 +50,81 @@ func (s *Store) Search(targets []string, exclude string) []SearchResult {
 	return results
 }
 
-// seed populates the store with mock players for development / demo.
-func (s *Store) seed() {
-	mock := []*Player{
-		{Username: "NightCrawl3r", Characters: []string{"Psylocke", "Storm", "Black Widow"}, Rank: "Platinum III", Region: "NA-East"},
-		{Username: "IronCore99", Characters: []string{"Iron Man", "Thor", "Star-Lord"}, Rank: "Gold I", Region: "NA-West"},
-		{Username: "WolvieMain", Characters: []string{"Wolverine", "Winter Soldier", "Black Panther"}, Rank: "Diamond II", Region: "EU"},
-		{Username: "StrangeLoop", Characters: []string{"Doctor Strange", "Loki", "Adam Warlock"}, Rank: "Celestial", Region: "EU"},
-		{Username: "BigGreenMachine", Characters: []string{"Hulk", "The Thing", "Groot"}, Rank: "Silver I", Region: "NA-East"},
-		{Username: "WebSlinger42", Characters: []string{"Spider-Man", "Moon Knight", "Squirrel Girl"}, Rank: "Gold III", Region: "NA-West"},
-		{Username: "ChaosQueen", Characters: []string{"Scarlet Witch", "Storm", "Hela"}, Rank: "Platinum I", Region: "EU"},
-		{Username: "HealBot5000", Characters: []string{"Mantis", "Luna Snow", "Cloak & Dagger"}, Rank: "Gold II", Region: "Asia"},
-		{Username: "RocketMann", Characters: []string{"Rocket Raccoon", "Groot", "Star-Lord"}, Rank: "Platinum II", Region: "NA-East"},
-		{Username: "MagnetoRises", Characters: []string{"Magneto", "Doctor Strange", "Captain America"}, Rank: "Diamond I", Region: "EU"},
-		{Username: "JeffFan2025", Characters: []string{"Jeff the Land Shark", "Invisible Woman", "Luna Snow"}, Rank: "Gold I", Region: "Asia"},
-		{Username: "PunkPeni", Characters: []string{"Peni Parker", "Venom", "The Punisher"}, Rank: "Platinum III", Region: "NA-West"},
-		{Username: "HelaMains", Characters: []string{"Hela", "Scarlet Witch", "Storm"}, Rank: "Diamond III", Region: "NA-East"},
-		{Username: "ThorHammer", Characters: []string{"Thor", "Captain America", "Hulk"}, Rank: "Gold II", Region: "EU"},
-		{Username: "CosmicMantis", Characters: []string{"Mantis", "Adam Warlock", "Invisible Woman"}, Rank: "Platinum I", Region: "NA-West"},
+// Reveal returns the username for a given player ID, or "" if not found.
+func (s *Store) Reveal(id string) string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if p, ok := s.players[id]; ok {
+		return p.Username
 	}
-	for _, p := range mock {
-		s.players[p.Username] = p
+	return ""
+}
+
+// Get returns the full registered player by ID.
+func (s *Store) Get(id string) (*RegisteredPlayer, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	p, ok := s.players[id]
+	return p, ok
+}
+
+// NewPlayerID generates a short random ID like "rival-a3f2c1".
+func NewPlayerID() string {
+	b := make([]byte, 3)
+	rand.Read(b)
+	return "rival-" + hex.EncodeToString(b)
+}
+
+// Seed populates the store with mock players using the provided client.
+// Called at startup when no real data is available.
+func (s *Store) Seed(client RivalsClient) {
+	seeds := []struct {
+		username string
+		rank     string
+		region   string
+	}{
+		{"NightCrawl3r", "Platinum III", "NA-East"},
+		{"IronCore99", "Gold I", "NA-West"},
+		{"WolvieMain", "Diamond II", "EU"},
+		{"StrangeLoop", "Celestial", "EU"},
+		{"BigGreenMachine", "Silver I", "NA-East"},
+		{"WebSlinger42", "Gold III", "NA-West"},
+		{"ChaosQueen", "Platinum I", "EU"},
+		{"HealBot5000", "Gold II", "Asia"},
+		{"RocketMann", "Platinum II", "NA-East"},
+		{"MagnetoRises", "Diamond I", "EU"},
+		{"JeffFan2025", "Gold I", "Asia"},
+		{"PunkPeni", "Platinum III", "NA-West"},
+		{"HelaMains", "Diamond III", "NA-East"},
+		{"ThorHammer", "Gold II", "EU"},
+		{"CosmicMantis", "Platinum I", "NA-West"},
+	}
+
+	for _, seed := range seeds {
+		profile, err := client.FindPlayer(seed.username)
+		if err != nil {
+			continue
+		}
+		matches, err := client.FetchMatches(profile.UID, 20)
+		if err != nil {
+			continue
+		}
+		stats := AggregateStats(matches)
+		mains := TopMains(stats, 3)
+		lastActive := time.Now()
+		if len(matches) > 0 {
+			lastActive = time.Unix(matches[0].Timestamp, 0)
+		}
+
+		s.Register(&RegisteredPlayer{
+			ID:         NewPlayerID(),
+			Username:   seed.username,
+			UID:        profile.UID,
+			Stats:      stats,
+			MainChars:  mains,
+			Rank:       seed.rank,
+			Region:     seed.region,
+			LastActive: lastActive,
+		})
 	}
 }
