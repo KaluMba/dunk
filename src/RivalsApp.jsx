@@ -8,10 +8,14 @@ const REGIONS = ['NA-East','NA-West','EU','Asia','SA','OCE']
 const ROLE_COLOR = { vanguard:'#5b8fe8', duelist:'#e05858', strategist:'#52c47a' }
 const ROLE_TAG   = { vanguard:'VG', duelist:'DL', strategist:'ST' }
 
+// CDN slug overrides for heroes whose name doesn't match the CDN path
+const SLUG_OVERRIDES = { 'hulk': 'bruce-banner' }
+
 // Hero name → CDN slug: "Iron Man" → "iron-man", "Cloak & Dagger" → "cloak-dagger"
 function heroSlug(name) {
   if (!name) return ''
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
+  return SLUG_OVERRIDES[slug] ?? slug
 }
 
 function timeAgo(iso) {
