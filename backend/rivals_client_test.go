@@ -44,7 +44,7 @@ func match(hero string, win bool, k, d, a int64, playSecs string) APIMatch {
 		MatchUID:  "test-uid",
 		Timestamp: time.Now().Unix(),
 		MatchPlayer: APIMatchPlayer{
-			IsWin:     win,
+			IsWin:     FlexBool(win),
 			PlayerUID: "player-1",
 			PlayerHero: APIPlayerHero{
 				HeroName: hero,

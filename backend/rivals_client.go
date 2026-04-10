@@ -1,10 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"io"
+	"log"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -37,7 +41,7 @@ func AggregateStats(matches []APIMatch) map[string]*CharacterStats {
 			stats[name] = cs
 		}
 		cs.Games++
-		if m.MatchPlayer.IsWin {
+		if bool(m.MatchPlayer.IsWin) {
 			cs.Wins++
 		}
 		cs.Kills += h.Kills
@@ -155,7 +159,7 @@ func (m *MockRivalsClient) FetchMatches(uid string, limit int) ([]APIMatch, erro
 			MatchUID:  fmt.Sprintf("%s-%d", uid, i),
 			Timestamp: time.Now().Add(-time.Duration(i*3) * time.Hour).Unix(),
 			MatchPlayer: APIMatchPlayer{
-				IsWin:     isWin,
+				IsWin:     FlexBool(isWin),
 				PlayerUID: uid,
 				PlayerHero: APIPlayerHero{
 					HeroName: hero,
@@ -194,8 +198,14 @@ func NewLiveClient(apiKey string) *LiveRivalsClient {
 	}
 }
 
-func (c *LiveRivalsClient) get(url string, out any) error {
-	req, err := http.NewRequest("GET", url, nil)
+// apiErrBody extracts a human-readable message from API error response bodies.
+type apiErrBody struct {
+	Message string `json:"message"`
+	Error   string `json:"error"`
+}
+
+func (c *LiveRivalsClient) get(rawURL string, out any) error {
+	req, err := http.NewRequest("GET", rawURL, nil)
 	if err != nil {
 		return err
 	}
@@ -207,6 +217,12 @@ func (c *LiveRivalsClient) get(url string, out any) error {
 	}
 	defer resp.Body.Close()
 
+	// Read the full body so we can both decode it and log it on error.
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
 	if resp.StatusCode == http.StatusNotFound {
 		return fmt.Errorf("not found")
 	}
@@ -214,27 +230,50 @@ func (c *LiveRivalsClient) get(url string, out any) error {
 		return fmt.Errorf("invalid API key")
 	}
 	if resp.StatusCode != http.StatusOK {
+		// Try to pull a human-readable message out of the error body.
+		var apiErr apiErrBody
+		if json.Unmarshal(body, &apiErr) == nil {
+			if apiErr.Message != "" {
+				return fmt.Errorf("%s", apiErr.Message)
+			}
+			if apiErr.Error != "" {
+				return fmt.Errorf("%s", apiErr.Error)
+			}
+		}
+		log.Printf("api %s returned %d: %s", rawURL, resp.StatusCode, body)
 		return fmt.Errorf("api returned %d", resp.StatusCode)
 	}
-	return json.NewDecoder(resp.Body).Decode(out)
+
+	if err := json.NewDecoder(bytes.NewReader(body)).Decode(out); err != nil {
+		log.Printf("api decode error for %s: %v — body: %s", rawURL, err, body)
+		return err
+	}
+	return nil
 }
 
 func (c *LiveRivalsClient) FindPlayer(username string) (*apiFindPlayerResp, error) {
 	var r apiFindPlayerResp
-	url := fmt.Sprintf("https://marvelrivalsapi.com/api/v1/find-player/%s", username)
-	if err := c.get(url, &r); err != nil {
+	// PathEscape handles # and other special chars common in game usernames.
+	endpoint := fmt.Sprintf("https://marvelrivalsapi.com/api/v1/find-player/%s",
+		url.PathEscape(username))
+	if err := c.get(endpoint, &r); err != nil {
 		return nil, err
+	}
+	// If the API returned 200 but empty — treat as not found.
+	if r.UID == "" {
+		log.Printf("find-player returned empty UID for %q", username)
+		return nil, fmt.Errorf("not found")
 	}
 	return &r, nil
 }
 
 func (c *LiveRivalsClient) FetchMatches(uid string, limit int) ([]APIMatch, error) {
-	url := fmt.Sprintf(
-		"https://marvelrivalsapi.com/api/v1/player/%s/match-history?season=1&skip=%d",
-		uid, limit,
+	endpoint := fmt.Sprintf(
+		"https://marvelrivalsapi.com/api/v1/player/%s/match-history?season=1&limit=%d",
+		url.PathEscape(uid), limit,
 	)
 	var r apiMatchHistoryResp
-	if err := c.get(url, &r); err != nil {
+	if err := c.get(endpoint, &r); err != nil {
 		return nil, err
 	}
 	return r.MatchHistory, nil

@@ -1,9 +1,35 @@
 package main
 
 import (
+	"encoding/json"
 	"math"
 	"time"
 )
+
+// FlexBool unmarshals JSON booleans, ints (0/1), strings, AND objects gracefully.
+// MarvelRivalsAPI occasionally sends is_win as a non-standard type.
+type FlexBool bool
+
+func (b *FlexBool) UnmarshalJSON(data []byte) error {
+	var v bool
+	if err := json.Unmarshal(data, &v); err == nil {
+		*b = FlexBool(v)
+		return nil
+	}
+	var n int64
+	if err := json.Unmarshal(data, &n); err == nil {
+		*b = FlexBool(n != 0)
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		*b = FlexBool(s == "1" || s == "true" || s == "True" || s == "yes")
+		return nil
+	}
+	// Object, null, or unknown — treat as false (draw / no-win).
+	*b = false
+	return nil
+}
 
 // ── Public types (sent in API responses) ────────────────────────────────────
 
@@ -125,7 +151,7 @@ type APIMatch struct {
 }
 
 type APIMatchPlayer struct {
-	IsWin      bool          `json:"is_win"`
+	IsWin      FlexBool      `json:"is_win"`
 	PlayerUID  string        `json:"player_uid"`
 	PlayerHero APIPlayerHero `json:"player_hero"`
 }
