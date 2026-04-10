@@ -36,18 +36,24 @@ func main() {
 	mux.HandleFunc("GET /api/player/{id}", handlePlayer)
 	mux.HandleFunc("GET /api/health", handleHealth)
 
+	rl := NewRateLimiter()
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 
 	log.Printf("listening on :%s", port)
-	log.Fatal(http.ListenAndServe(":"+port, cors(mux)))
+	log.Fatal(http.ListenAndServe(":"+port, cors(rateLimitMiddleware(rl)(mux))))
 }
 
 func cors(next http.Handler) http.Handler {
+	origin := os.Getenv("ALLOWED_ORIGIN")
+	if origin == "" {
+		origin = "*"
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		if r.Method == http.MethodOptions {
