@@ -76,6 +76,8 @@ export default function RivalsOverlay({ onClose }) {
   const [chars, setChars]       = useState([])
   const [loading, setLoading]   = useState(true)
   const [newId, setNewId]       = useState(null)
+  const [copiedId, setCopiedId] = useState(null)
+  const [kdInfo, setKdInfo]     = useState(false)
 
   // Join form
   const [username, setUsername] = useState('')
@@ -178,11 +180,20 @@ export default function RivalsOverlay({ onClose }) {
                 </div>
               ) : (<>
                 {/* Column headers */}
-                <div style={s.colHead}>
+                <div style={s.colHead} onClick={() => setKdInfo(false)}>
                   <span style={{ ...s.colLbl, flex: 1 }}>PLAYER</span>
                   <span style={{ ...s.colLbl, width: 80, textAlign: 'right' }}>TOP CHAR</span>
                   <span style={{ ...s.colLbl, width: 52, textAlign: 'right' }}>WR</span>
-                  <span style={{ ...s.colLbl, width: 48, textAlign: 'right' }}>KDA</span>
+                  <span style={{ ...s.colLbl, width: 48, textAlign: 'right', position: 'relative', cursor: 'pointer' }}
+                        onClick={e => { e.stopPropagation(); setKdInfo(v => !v) }}>
+                    K/D ⓘ
+                    {kdInfo && (
+                      <div style={s.kdTooltip}>
+                        <strong style={{ color: T, display: 'block', marginBottom: 3 }}>Kill / Death ratio</strong>
+                        Final eliminations divided by deaths. Does not include assists.
+                      </div>
+                    )}
+                  </span>
                   <span style={{ ...s.colLbl, width: 52, textAlign: 'right' }}>LAST ON</span>
                 </div>
                 <div style={s.divider} />
@@ -190,9 +201,17 @@ export default function RivalsOverlay({ onClose }) {
                   {players.map(p => {
                     const main = p.mainCharacters?.[0]
                     const st   = main && p.stats?.[main]
-                    const isNew = p.id === newId
+                    const isNew    = p.id === newId
+                    const isCopied = p.id === copiedId
                     return (
-                      <div key={p.id} style={{ ...s.row, ...(isNew ? s.rowNew : {}) }}>
+                      <div key={p.id} style={{ ...s.row, ...(isNew ? s.rowNew : {}), cursor: 'pointer' }}
+                           title="Click to copy username"
+                           onClick={() => {
+                             navigator.clipboard.writeText(p.username).catch(() => {})
+                             setCopiedId(p.id)
+                             const id = p.id
+                             setTimeout(() => setCopiedId(cur => cur === id ? null : cur), 1500)
+                           }}>
                         <HeroPortrait name={main ?? ''} size={36} />
                         <div style={s.rowMid}>
                           <span style={s.rowName}>{p.username}</span>
@@ -210,9 +229,10 @@ export default function RivalsOverlay({ onClose }) {
                         <span style={{ ...s.rowCell, width: 48, color: st ? T : '#3a3530' }}>
                           {st ? st.kda.toFixed(2) : '—'}
                         </span>
-                        <span style={{ ...s.rowCell, width: 52, color: '#4a4438', fontSize: 9, fontFamily: MONO }}>
-                          {timeAgo(p.lastActive)}
-                        </span>
+                        {isCopied
+                          ? <span style={{ ...s.rowCell, width: 52, fontSize: 9, color: '#52c47a', fontFamily: MONO }}>COPIED ✓</span>
+                          : <span style={{ ...s.rowCell, width: 52, color: '#4a4438', fontSize: 9, fontFamily: MONO }}>{timeAgo(p.lastActive)}</span>
+                        }
                       </div>
                     )
                   })}
@@ -380,6 +400,13 @@ const s = {
   metaTag: { fontSize: 7, fontWeight: 700, color: TDD, border: `1px solid ${BDR}`, padding: '1px 5px', letterSpacing: '0.06em' },
   rowCell: { flexShrink: 0, fontSize: 11, fontWeight: 600, textAlign: 'right', fontFamily: MONO },
   rowCount: { fontSize: 7, color: TDD, letterSpacing: '0.16em', textAlign: 'center', padding: '16px 0 0' },
+  kdTooltip: {
+    position: 'absolute', right: 0, top: '150%', zIndex: 20,
+    background: '#1c1814', border: `1px solid ${BDR}`,
+    padding: '8px 10px', width: 160, textAlign: 'left',
+    fontSize: 9, color: TD, lineHeight: 1.7, letterSpacing: '0.02em',
+    boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
+  },
 
   empty:  { display: 'flex', flexDirection: 'column', gap: 8, padding: '48px 22px' },
   emptyT: { fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', color: TD },

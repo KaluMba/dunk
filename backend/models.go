@@ -102,7 +102,7 @@ func (s *CharacterStats) compute() {
 	if d == 0 {
 		d = 1
 	}
-	s.KDA = math.Round(float64(s.Kills+s.Assists)/float64(d)*100) / 100
+	s.KDA = math.Round(float64(s.Kills)/float64(d)*100) / 100
 	s.PlaytimeHours = math.Round(float64(s.PlaytimeS)/3600*10) / 10
 }
 
