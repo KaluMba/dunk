@@ -326,7 +326,7 @@ export default function App() {
 
   // Slow 3D to near-stop when overlay is open
   useEffect(() => {
-    timeScale.current = rivalsOpen ? 0.04 : 1
+    timeScale.current = rivalsOpen ? 0.12 : 1
   }, [rivalsOpen])
 
   const handleClick = useCallback(() => {
@@ -356,8 +356,12 @@ export default function App() {
         style={{ width: '100dvw', height: '100dvh', cursor: rivalsOpen ? 'default' : 'pointer', position: 'relative' }}
         onClick={handleClick}
       >
-        {/* Chromatic aberration overlays — only when rivals is open */}
-        {rivalsOpen && <><div className="chroma-r" /><div className="chroma-b" /></>}
+        {/* Comic-book overlays — only when rivals is open */}
+        {rivalsOpen && <>
+          <div className="comic-halftone" />
+          <div className="chroma-r" />
+          <div className="chroma-b" />
+        </>}
 
         <div style={{
           position: 'absolute',

@@ -322,9 +322,9 @@ const s = {
   },
   panel: {
     width: '100%', maxWidth: 600, height: '100dvh',
-    background: 'linear-gradient(to right, rgba(4,3,10,0) 0%, rgba(4,3,10,0.68) 52px, rgba(4,3,10,0.82) 100%)',
-    backdropFilter: 'blur(32px) saturate(1.7)',
-    WebkitBackdropFilter: 'blur(32px) saturate(1.7)',
+    background: 'linear-gradient(to right, rgba(4,3,10,0) 0%, rgba(4,3,10,0.78) 52px, rgba(4,3,10,0.92) 100%)',
+    backdropFilter: 'blur(6px) saturate(1.4)',
+    WebkitBackdropFilter: 'blur(6px) saturate(1.4)',
     display: 'flex', flexDirection: 'column',
     fontFamily: SANS, color: T,
     animation: 'rivalsPanelIn 0.38s cubic-bezier(0.16,1,0.3,1)',
