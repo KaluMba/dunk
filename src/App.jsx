@@ -360,6 +360,18 @@ export default function App() {
       }}>
         dunk
       </div>
+      <a
+        href="#rivals"
+        style={{
+          position: 'absolute', bottom: 24, right: 24, zIndex: 20,
+          color: 'rgba(255,255,255,0.25)', fontSize: 11, fontFamily: "'Syne', sans-serif",
+          fontWeight: 700, letterSpacing: '0.1em', textDecoration: 'none', textTransform: 'uppercase',
+          pointerEvents: 'all',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        find teammates →
+      </a>
       <Canvas shadows camera={{ position: [0, 32, 42], fov: 60 }}>
         <color attach="background" args={[palette.bg]} />
         <fog attach="fog" color={palette.bg} near={fog.near} far={fog.far} />
