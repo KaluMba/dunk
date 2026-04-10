@@ -76,7 +76,7 @@ export default function RivalsOverlay({ onClose }) {
   // Join form
   const [username, setUsername] = useState('')
   const [rank, setRank]         = useState('')
-  const [region, setRegion]     = useState('')
+  const [region, setRegion]     = useState('NA-East')
   const [selected, setSelected] = useState([])
   const [roleFilter, setFilter] = useState('all')
   const [joining, setJoining]   = useState(false)
@@ -228,7 +228,7 @@ export default function RivalsOverlay({ onClose }) {
                   <span style={s.fieldLbl}>MARVEL RIVALS USERNAME</span>
                   <input ref={usernameRef} style={s.input}
                     value={username} onChange={e => setUsername(e.target.value)}
-                    placeholder="e.g. IronCore99" autoComplete="off" spellCheck={false} />
+                    placeholder="Username" autoComplete="off" spellCheck={false} />
                   <div style={s.inputLine} />
                 </div>
                 <div style={s.fieldRow}>
