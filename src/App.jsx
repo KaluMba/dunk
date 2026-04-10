@@ -12,14 +12,46 @@ function heightAt(x, z) {
   )
 }
 
-function pick(arr) { return arr[Math.floor(Math.random() * arr.length)] }
+// Shuffle deck: cycles through all values in random order before repeating.
+// Guarantees no consecutive repeats even at deck boundaries.
+function shuffle(arr, avoid) {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  // Ensure the first card drawn (from the end) doesn't match the last card from the previous deck
+  if (avoid != null && a.length > 1) {
+    const top = a.length - 1
+    if (a[top] === avoid) {
+      const swap = Math.floor(Math.random() * top)
+      ;[a[top], a[swap]] = [a[swap], a[top]]
+    }
+  }
+  return a
+}
 
-function randomVariant() {
+class Deck {
+  constructor(arr) { this.arr = arr; this.last = null; this.cards = shuffle(arr) }
+  draw() {
+    if (!this.cards.length) this.cards = shuffle(this.arr, this.last)
+    return (this.last = this.cards.pop())
+  }
+}
+
+const decks = {
+  renderMode: new Deck(RENDER_MODES),
+  palette:    new Deck(PALETTES),
+  lighting:   new Deck(LIGHTINGS),
+  fog:        new Deck(FOGS),
+}
+
+function nextVariant() {
   return {
-    renderMode: pick(RENDER_MODES),
-    palette:    pick(PALETTES),
-    lighting:   pick(LIGHTINGS),
-    fog:        pick(FOGS),
+    renderMode: decks.renderMode.draw(),
+    palette:    decks.palette.draw(),
+    lighting:   decks.lighting.draw(),
+    fog:        decks.fog.draw(),
   }
 }
 
@@ -282,7 +314,7 @@ function CinematicCamera() {
 }
 
 export default function App() {
-  const [variant, setVariant] = useState(randomVariant)
+  const [variant, setVariant] = useState(nextVariant)
   const musicStarted = useRef(false)
 
   const handleClick = useCallback(() => {
@@ -290,7 +322,7 @@ export default function App() {
       startMusic()
       musicStarted.current = true
     }
-    setVariant(randomVariant())
+    setVariant(nextVariant())
   }, [])
 
   const { renderMode, palette, lighting, fog } = variant
