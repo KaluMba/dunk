@@ -24,9 +24,6 @@ func main() {
 	}
 
 	store = NewStore()
-	log.Println("seeding registry with mock players...")
-	store.Seed(rivals)
-	log.Printf("seeded %d players", len(store.players))
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/characters", handleCharacters)

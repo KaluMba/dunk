@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 
-// Auto-prefix https:// if env var was set without a protocol
-const _raw = import.meta.env.VITE_RIVALS_API ?? ''
-const API  = _raw ? (_raw.startsWith('http') ? _raw : `https://${_raw}`) : 'http://localhost:8080'
+// Auto-prefix https:// and strip any trailing slash
+const _raw = (import.meta.env.VITE_RIVALS_API ?? '').trim()
+const API  = (_raw ? (_raw.startsWith('http') ? _raw : `https://${_raw}`) : 'http://localhost:8080').replace(/\/+$/, '')
 
 const RANKS   = ['Bronze','Silver','Gold','Platinum','Diamond','Celestial','One Above All']
 const REGIONS = ['NA-East','NA-West','EU','Asia','SA','OCE']
@@ -28,7 +28,7 @@ function Portrait({ id, name, role, size = 48 }) {
     <div style={{ width: size, height: size, flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
       {!failed ? (
         <img
-          src={`https://marvelrivalsapi.com/rivals/heroes/${id}/portrait.png`}
+          src={`https://marvelrivalsapi.com/heroes/transformations/${id}-headbig-0.webp`}
           alt={name}
           onError={() => setFailed(true)}
           style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }}
@@ -264,9 +264,27 @@ export default function RivalsOverlay({ onClose }) {
     setSelected(p => p.includes(name) ? p.filter(c => c !== name) : [...p, name])
   }
 
-  async function submit(e) {
+  async function searchOnly(e) {
     e.preventDefault()
-    if (!username.trim()) return setError('Username required')
+    if (!selected.length) return setError('Select at least one character')
+    setError(''); setLoading(true)
+    try {
+      const params = new URLSearchParams({ characters: selected.join(',') })
+      const sr = await fetch(`${API}/api/search?${params}`)
+      if (!sr.ok) throw new Error('Search failed')
+      setResults((await sr.json()) ?? [])
+      setMyProfile(null)
+      setStep('results')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function joinAndSearch(e) {
+    e.preventDefault()
+    if (!username.trim()) return setError('Username required to join')
     if (!selected.length) return setError('Select at least one character')
     setError(''); setLoading(true)
     try {
@@ -315,7 +333,7 @@ export default function RivalsOverlay({ onClose }) {
         <div style={s.body} className="rivals-scroll">
 
           {step === 'form' && (
-            <form onSubmit={submit} style={s.form}>
+            <form onSubmit={e => e.preventDefault()} style={s.form}>
 
               <section style={s.section}>
                 <p style={s.sectionLbl}>IDENTIFY</p>
@@ -377,9 +395,14 @@ export default function RivalsOverlay({ onClose }) {
 
               {error && <p style={s.error}>{error}</p>}
 
-              <button type="submit" style={s.submitBtn} disabled={loading}>
-                {loading ? '— SCANNING REGISTRY...' : 'SEARCH REGISTRY ──────────────────→'}
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <button type="button" style={s.submitBtn} disabled={loading} onClick={searchOnly}>
+                  {loading ? '— SCANNING...' : 'SEARCH REGISTRY ──────────────────→'}
+                </button>
+                <button type="button" style={{ ...s.submitBtn, borderColor: `${A}55`, fontSize: 8, padding: '10px 18px' }} disabled={loading} onClick={joinAndSearch}>
+                  {loading ? '— SCANNING...' : '✦ JOIN + SEARCH  (adds you to the registry)'}
+                </button>
+              </div>
             </form>
           )}
 
